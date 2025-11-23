@@ -331,6 +331,50 @@ class WhatsAppService extends EventEmitter {
     return code;
   }
 
+  async clearSession(): Promise<{ cleared: boolean; message: string }> {
+    // Disconnect socket if active
+    if (this.socket) {
+      try {
+        this.socket.end(undefined);
+      } catch (err) {
+        logger.warn('Error ending socket:', err);
+      }
+      this.socket = null;
+    }
+
+    // Reset state
+    this.isConnected = false;
+    this.isConnecting = false;
+    this.qrCode = null;
+    this.reconnectAttempts = 0;
+    this.lastError = null;
+
+    // Check and delete auth folder
+    if (fs.existsSync(this.authPath)) {
+      try {
+        fs.rmSync(this.authPath, { recursive: true, force: true });
+        logger.info(`WhatsApp session cleared: ${this.authPath}`);
+        this.emit('session_cleared');
+        return {
+          cleared: true,
+          message: 'WhatsApp session cleared successfully'
+        };
+      } catch (err) {
+        logger.error('Error clearing session:', err);
+        return {
+          cleared: false,
+          message: `Failed to clear session: ${(err as Error).message}`
+        };
+      }
+    }
+
+    logger.info('No WhatsApp session to clear');
+    return {
+      cleared: false,
+      message: 'No session found to clear'
+    };
+  }
+
   private formatPhoneNumber(phoneNumber: string): string {
     // Remove any non-digit characters
     let cleaned = phoneNumber.replace(/\D/g, '');

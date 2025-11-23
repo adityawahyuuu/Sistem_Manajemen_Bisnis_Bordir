@@ -63,6 +63,18 @@ export const whatsappController = {
     }
   },
 
+  async clearSession(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await whatsappService.clearSession();
+
+      sendSuccess(res, {
+        cleared: result.cleared,
+      }, result.message);
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async sendMessage(req: Request, res: Response, next: NextFunction) {
     try {
       const { phoneNumber, message } = req.body;
