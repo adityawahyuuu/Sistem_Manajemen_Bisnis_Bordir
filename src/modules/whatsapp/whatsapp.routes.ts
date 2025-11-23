@@ -54,6 +54,40 @@ router.get('/status', whatsappController.getStatus);
 
 /**
  * @swagger
+ * /whatsapp/pairing-code:
+ *   post:
+ *     summary: Request pairing code for mobile device
+ *     tags: [WhatsApp]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - phoneNumber
+ *             properties:
+ *               phoneNumber:
+ *                 type: string
+ *                 description: Phone number to pair (e.g., 08123456789)
+ *     responses:
+ *       200:
+ *         description: Pairing code generated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 pairingCode:
+ *                   type: string
+ *                   description: 8-digit pairing code (e.g., ABCD-EFGH)
+ */
+router.post('/pairing-code', requireAdmin, whatsappController.requestPairingCode);
+
+/**
+ * @swagger
  * /whatsapp/send:
  *   post:
  *     summary: Send a text message via WhatsApp

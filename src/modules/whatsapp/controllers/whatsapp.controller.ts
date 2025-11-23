@@ -45,6 +45,24 @@ export const whatsappController = {
     }
   },
 
+  async requestPairingCode(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { phoneNumber } = req.body;
+
+      if (!phoneNumber) {
+        return sendFail(res, 'Phone number is required', 400);
+      }
+
+      const pairingCode = await whatsappService.requestPairingCode(phoneNumber);
+
+      sendSuccess(res, {
+        pairingCode,
+      }, 'Pairing code generated');
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async sendMessage(req: Request, res: Response, next: NextFunction) {
     try {
       const { phoneNumber, message } = req.body;
