@@ -15,12 +15,33 @@ export type OutputFormat = 'docx' | 'pdf';
 
 class DocumentGenerator {
   private ensureDirectories(): void {
-    const dirs = [storageConfig.templatesPath, storageConfig.generatedPath];
-    dirs.forEach(dir => {
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
+    // Ensure templates directory exists
+    if (!fs.existsSync(storageConfig.templatesPath)) {
+      fs.mkdirSync(storageConfig.templatesPath, { recursive: true });
+    }
+
+    // For generated path: create if not exists, clear files if exists
+    if (!fs.existsSync(storageConfig.generatedPath)) {
+      fs.mkdirSync(storageConfig.generatedPath, { recursive: true });
+      logger.info(`Created directory: ${storageConfig.generatedPath}`);
+    } else {
+      // Clear all files in generated folder
+      try {
+        const files = fs.readdirSync(storageConfig.generatedPath);
+        for (const file of files) {
+          const filePath = path.join(storageConfig.generatedPath, file);
+          const stat = fs.statSync(filePath);
+          if (stat.isFile()) {
+            fs.unlinkSync(filePath);
+          }
+        }
+        if (files.length > 0) {
+          logger.info(`Cleared ${files.length} files from: ${storageConfig.generatedPath}`);
+        }
+      } catch (err) {
+        logger.error('Error clearing generated files:', err);
       }
-    });
+    }
   }
 
   async generateDocx(
