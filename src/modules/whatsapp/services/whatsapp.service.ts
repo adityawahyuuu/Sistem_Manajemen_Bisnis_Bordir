@@ -312,6 +312,25 @@ class WhatsAppService extends EventEmitter {
     };
   }
 
+  async requestPairingCode(phoneNumber: string): Promise<string> {
+    if (!this.socket) {
+      throw new Error('WhatsApp socket not initialized. Call initialize first.');
+    }
+
+    if (this.isConnected) {
+      throw new Error('WhatsApp already connected. Pairing code not needed.');
+    }
+
+    // Format phone number
+    const cleaned = phoneNumber.replace(/\D/g, '').replace(/^0+/, '');
+    const phoneWithCountry = cleaned.startsWith('62') ? cleaned : '62' + cleaned;
+
+    const code = await this.socket.requestPairingCode(phoneWithCountry);
+    logger.info(`Pairing code generated: ${code}`);
+
+    return code;
+  }
+
   private formatPhoneNumber(phoneNumber: string): string {
     // Remove any non-digit characters
     let cleaned = phoneNumber.replace(/\D/g, '');
