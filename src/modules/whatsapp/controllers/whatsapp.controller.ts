@@ -45,21 +45,6 @@ export const whatsappController = {
     }
   },
 
-  async getQRCode(req: Request, res: Response, next: NextFunction) {
-    try {
-      const qrCode = whatsappService.getQRCode();
-
-      if (!qrCode) {
-        return sendFail(res, 'No QR code available. WhatsApp may already be connected.', 400);
-      }
-
-      const qrCodeImage = await QRCode.toDataURL(qrCode);
-      sendSuccess(res, { qrCode: qrCodeImage }, 'QR code retrieved');
-    } catch (error) {
-      next(error);
-    }
-  },
-
   async sendMessage(req: Request, res: Response, next: NextFunction) {
     try {
       const { phoneNumber, message } = req.body;
@@ -70,7 +55,7 @@ export const whatsappController = {
 
       const result = await whatsappService.sendMessage(phoneNumber, message);
       sendSuccess(res, {
-        messageId: result.key.id,
+        messageId: result.key?.id,
         to: phoneNumber,
       }, 'Message sent successfully');
     } catch (error) {
@@ -94,7 +79,7 @@ export const whatsappController = {
       );
 
       sendSuccess(res, {
-        messageId: result.key.id,
+        messageId: result.key?.id,
         to: phoneNumber,
         fileName,
       }, 'Document sent successfully');
@@ -160,7 +145,7 @@ export const whatsappController = {
       );
 
       sendSuccess(res, {
-        messageId: result.key.id,
+        messageId: result.key?.id,
         to: targetPhone,
         invoiceNumber: invoice.invoice_number,
       }, 'Invoice sent via WhatsApp');
@@ -198,7 +183,7 @@ export const whatsappController = {
       );
 
       sendSuccess(res, {
-        messageId: result.key.id,
+        messageId: result.key?.id,
         to: targetPhone,
         receiptNumber: receipt.receipt_number,
       }, 'Receipt sent via WhatsApp');
@@ -237,7 +222,7 @@ export const whatsappController = {
       );
 
       sendSuccess(res, {
-        messageId: result.key.id,
+        messageId: result.key?.id,
         to: targetPhone,
         waybillNumber: waybill.waybill_number,
       }, 'Waybill sent via WhatsApp');

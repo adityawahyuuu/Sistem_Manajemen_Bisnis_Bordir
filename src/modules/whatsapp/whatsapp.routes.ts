@@ -54,22 +54,6 @@ router.get('/status', whatsappController.getStatus);
 
 /**
  * @swagger
- * /whatsapp/qr:
- *   get:
- *     summary: Get QR code for WhatsApp authentication
- *     tags: [WhatsApp]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: QR code retrieved
- *       400:
- *         description: No QR code available
- */
-router.get('/qr', whatsappController.getQRCode);
-
-/**
- * @swagger
  * /whatsapp/send:
  *   post:
  *     summary: Send a text message via WhatsApp

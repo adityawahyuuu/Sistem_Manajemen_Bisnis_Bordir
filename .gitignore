@@ -16,7 +16,7 @@ npm-debug.log*
 
 # Storage
 storage/generated/
-storage/whatsapp/auth_info_baileys/
+storage/whatsapp/
 
 # IDE
 .vscode/

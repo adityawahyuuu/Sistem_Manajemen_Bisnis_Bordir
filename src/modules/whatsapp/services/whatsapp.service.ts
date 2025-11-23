@@ -2,7 +2,7 @@ import makeWASocket, {
   DisconnectReason,
   useMultiFileAuthState,
   WASocket,
-  proto,
+  WAMessage,
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import * as fs from 'fs';
@@ -17,22 +17,32 @@ class WhatsAppService extends EventEmitter {
   private isConnected: boolean = false;
   private isConnecting: boolean = false;
   private authPath: string;
+  private reconnectAttempts: number = 0;
+  private maxReconnectAttempts: number = 3;
+  private lastError: string | null = null;
 
   constructor() {
     super();
     this.authPath = path.join(storageConfig.whatsappPath, 'auth');
   }
 
-  async initialize(): Promise<{ qrCode?: string; status: string }> {
+  async initialize(): Promise<{ qrCode?: string; status: string; error?: string }> {
+    // If already connecting, return current state
     if (this.isConnecting) {
-      return { status: 'connecting', qrCode: this.qrCode || undefined };
+      return {
+        status: 'connecting',
+        qrCode: this.qrCode || undefined,
+        error: this.lastError || undefined
+      };
     }
 
+    // If already connected, return connected status
     if (this.isConnected && this.socket) {
       return { status: 'connected' };
     }
 
     this.isConnecting = true;
+    this.lastError = null;
 
     try {
       // Ensure auth directory exists
@@ -44,45 +54,87 @@ class WhatsAppService extends EventEmitter {
 
       this.socket = makeWASocket({
         auth: state,
-        printQRInTerminal: true,
         browser: ['Bordir System', 'Chrome', '1.0.0'],
+        connectTimeoutMs: 60000,
+        defaultQueryTimeoutMs: 60000,
+        retryRequestDelayMs: 2000,
+        markOnlineOnConnect: false,
+        syncFullHistory: false,
       });
 
-      // Handle connection updates
-      this.socket.ev.on('connection.update', async (update) => {
-        const { connection, lastDisconnect, qr } = update;
+      // Create a promise that resolves when QR is generated or connection is established
+      const connectionPromise = new Promise<{ qrCode?: string; status: string; error?: string }>((resolve) => {
+        const timeout = setTimeout(() => {
+          resolve({
+            status: this.isConnected ? 'connected' : 'timeout',
+            qrCode: this.qrCode || undefined,
+            error: this.isConnected ? undefined : 'Connection timeout - please try again'
+          });
+        }, 15000); // 15 second timeout
 
-        if (qr) {
-          this.qrCode = qr;
-          this.emit('qr', qr);
-          logger.info('QR Code generated');
-        }
+        // Handle connection updates
+        this.socket!.ev.on('connection.update', async (update) => {
+          const { connection, lastDisconnect, qr } = update;
 
-        if (connection === 'close') {
-          const shouldReconnect =
-            (lastDisconnect?.error as Boom)?.output?.statusCode !==
-            DisconnectReason.loggedOut;
-
-          logger.info(
-            `Connection closed. Reconnect: ${shouldReconnect}`
-          );
-
-          this.isConnected = false;
-          this.isConnecting = false;
-
-          if (shouldReconnect) {
-            setTimeout(() => this.initialize(), 5000);
-          } else {
-            this.qrCode = null;
-            this.emit('disconnected');
+          if (qr) {
+            this.qrCode = qr;
+            this.emit('qr', qr);
+            logger.info('QR Code generated - scan with WhatsApp to connect');
+            clearTimeout(timeout);
+            resolve({
+              status: 'qr_ready',
+              qrCode: qr
+            });
           }
-        } else if (connection === 'open') {
-          this.isConnected = true;
-          this.isConnecting = false;
-          this.qrCode = null;
-          logger.info('WhatsApp connected successfully');
-          this.emit('connected');
-        }
+
+          if (connection === 'close') {
+            const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
+            const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+            const errorMessage = (lastDisconnect?.error as Boom)?.message || 'Unknown error';
+
+            logger.warn(
+              `WhatsApp connection closed. Status: ${statusCode}, Error: ${errorMessage}, Reconnect: ${shouldReconnect}`
+            );
+
+            this.isConnected = false;
+            this.isConnecting = false;
+            this.lastError = errorMessage;
+
+            // Only auto-reconnect if under max attempts and not logged out
+            if (shouldReconnect && this.reconnectAttempts < this.maxReconnectAttempts) {
+              this.reconnectAttempts++;
+              const delay = Math.min(5000 * this.reconnectAttempts, 30000); // Max 30 seconds
+              logger.info(`Reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms...`);
+              setTimeout(() => this.initialize(), delay);
+            } else {
+              this.qrCode = null;
+              this.reconnectAttempts = 0;
+              if (statusCode === DisconnectReason.loggedOut) {
+                logger.info('WhatsApp logged out - manual reconnection required');
+              } else {
+                logger.warn(`Max reconnection attempts (${this.maxReconnectAttempts}) reached. Manual reconnection required.`);
+              }
+              this.emit('disconnected');
+              clearTimeout(timeout);
+              resolve({
+                status: 'disconnected',
+                error: `Connection failed after ${this.maxReconnectAttempts} attempts: ${errorMessage}`
+              });
+            }
+          } else if (connection === 'open') {
+            this.isConnected = true;
+            this.isConnecting = false;
+            this.qrCode = null;
+            this.reconnectAttempts = 0; // Reset on successful connection
+            this.lastError = null;
+            logger.info('WhatsApp connected successfully');
+            this.emit('connected');
+            clearTimeout(timeout);
+            resolve({ status: 'connected' });
+          } else if (connection === 'connecting') {
+            logger.info('Connecting to WhatsApp...');
+          }
+        });
       });
 
       // Save credentials on update
@@ -97,24 +149,24 @@ class WhatsAppService extends EventEmitter {
         }
       });
 
-      // Wait a bit for QR code to be generated
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Wait for connection result
+      return await connectionPromise;
 
-      return {
-        status: this.isConnected ? 'connected' : 'connecting',
-        qrCode: this.qrCode || undefined,
-      };
     } catch (error) {
       this.isConnecting = false;
+      this.lastError = (error as Error).message;
       logger.error('WhatsApp initialization error:', error);
-      throw error;
+      return {
+        status: 'error',
+        error: (error as Error).message
+      };
     }
   }
 
   async sendMessage(
     phoneNumber: string,
     message: string
-  ): Promise<proto.WebMessageInfo> {
+  ): Promise<WAMessage> {
     if (!this.socket || !this.isConnected) {
       throw new Error('WhatsApp is not connected');
     }
@@ -139,7 +191,7 @@ class WhatsAppService extends EventEmitter {
     filePath: string,
     fileName: string,
     caption?: string
-  ): Promise<proto.WebMessageInfo> {
+  ): Promise<WAMessage> {
     if (!this.socket || !this.isConnected) {
       throw new Error('WhatsApp is not connected');
     }
@@ -170,7 +222,7 @@ class WhatsAppService extends EventEmitter {
     phoneNumber: string,
     imagePath: string,
     caption?: string
-  ): Promise<proto.WebMessageInfo> {
+  ): Promise<WAMessage> {
     if (!this.socket || !this.isConnected) {
       throw new Error('WhatsApp is not connected');
     }
@@ -216,6 +268,7 @@ class WhatsAppService extends EventEmitter {
       this.socket = null;
       this.isConnected = false;
       this.qrCode = null;
+      this.reconnectAttempts = 0;
 
       // Remove auth files
       if (fs.existsSync(this.authPath)) {
@@ -227,20 +280,36 @@ class WhatsAppService extends EventEmitter {
     }
   }
 
+  // Reset and try to connect again (manual reconnection)
+  async reconnect(): Promise<{ qrCode?: string; status: string; error?: string }> {
+    this.reconnectAttempts = 0;
+    this.isConnecting = false;
+    this.isConnected = false;
+    this.qrCode = null;
+    this.lastError = null;
+
+    if (this.socket) {
+      this.socket.end(undefined);
+      this.socket = null;
+    }
+
+    return this.initialize();
+  }
+
   getStatus(): {
     isConnected: boolean;
     isConnecting: boolean;
     qrCode: string | null;
+    reconnectAttempts: number;
+    lastError: string | null;
   } {
     return {
       isConnected: this.isConnected,
       isConnecting: this.isConnecting,
       qrCode: this.qrCode,
+      reconnectAttempts: this.reconnectAttempts,
+      lastError: this.lastError,
     };
-  }
-
-  getQRCode(): string | null {
-    return this.qrCode;
   }
 
   private formatPhoneNumber(phoneNumber: string): string {
