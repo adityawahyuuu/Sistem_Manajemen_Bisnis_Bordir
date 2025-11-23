@@ -88,6 +88,28 @@ router.post('/pairing-code', requireAdmin, whatsappController.requestPairingCode
 
 /**
  * @swagger
+ * /whatsapp/clear-session:
+ *   post:
+ *     summary: Clear WhatsApp session and auth data
+ *     tags: [WhatsApp]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Session cleared
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 cleared:
+ *                   type: boolean
+ *                   description: Whether session was cleared
+ */
+router.post('/clear-session', requireAdmin, whatsappController.clearSession);
+
+/**
+ * @swagger
  * /whatsapp/send:
  *   post:
  *     summary: Send a text message via WhatsApp
