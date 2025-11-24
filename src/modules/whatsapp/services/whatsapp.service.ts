@@ -26,7 +26,7 @@ class WhatsAppService extends EventEmitter {
     this.authPath = path.join(storageConfig.whatsappPath, 'auth');
   }
 
-  async initialize(): Promise<{ qrCode?: string; status: string; error?: string }> {
+  async initialize(phoneNumber?: string): Promise<{ qrCode?: string; pairingCode?: string; status: string; error?: string }> {
     // If already connecting, return current state
     if (this.isConnecting) {
       return {
@@ -60,14 +60,34 @@ class WhatsAppService extends EventEmitter {
         retryRequestDelayMs: 2000,
         markOnlineOnConnect: false,
         syncFullHistory: false,
+        printQRInTerminal: !phoneNumber,
       });
 
+      // If phone number provided, request pairing code immediately
+      let pairingCode: string | undefined;
+      if (phoneNumber && phoneNumber.trim()) {
+        try {
+          // Format phone number
+          const cleaned = phoneNumber.replace(/\D/g, '').replace(/^0+/, '');
+          const phoneWithCountry = cleaned.startsWith('62') ? cleaned : '62' + cleaned;
+
+          // Wait a bit for socket to be ready
+          await new Promise(resolve => setTimeout(resolve, 3000));
+
+          pairingCode = await this.socket.requestPairingCode(phoneWithCountry);
+          logger.info(`Pairing code generated: ${pairingCode}`);
+        } catch (err) {
+          logger.error('Failed to generate pairing code:', err);
+        }
+      }
+
       // Create a promise that resolves when QR is generated or connection is established
-      const connectionPromise = new Promise<{ qrCode?: string; status: string; error?: string }>((resolve) => {
+      const connectionPromise = new Promise<{ qrCode?: string; pairingCode?: string; status: string; error?: string }>((resolve) => {
         const timeout = setTimeout(() => {
           resolve({
             status: this.isConnected ? 'connected' : 'timeout',
             qrCode: this.qrCode || undefined,
+            pairingCode,
             error: this.isConnected ? undefined : 'Connection timeout - please try again'
           });
         }, 15000); // 15 second timeout
@@ -83,7 +103,8 @@ class WhatsAppService extends EventEmitter {
             clearTimeout(timeout);
             resolve({
               status: 'qr_ready',
-              qrCode: qr
+              qrCode: qr,
+              pairingCode
             });
           }
 

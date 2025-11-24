@@ -10,7 +10,8 @@ import * as QRCode from 'qrcode';
 export const whatsappController = {
   async initialize(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await whatsappService.initialize();
+      const { phoneNumber } = req.body;
+      const result = await whatsappService.initialize(phoneNumber);
 
       let qrCodeImage = null;
       if (result.qrCode) {
@@ -20,6 +21,7 @@ export const whatsappController = {
       sendSuccess(res, {
         status: result.status,
         qrCode: qrCodeImage,
+        pairingCode: result.pairingCode || null,
       }, 'WhatsApp initialization started');
     } catch (error) {
       next(error);
