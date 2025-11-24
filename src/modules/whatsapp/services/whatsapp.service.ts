@@ -63,9 +63,10 @@ class WhatsAppService extends EventEmitter {
         printQRInTerminal: !phoneNumber,
       });
 
-      // If phone number provided, request pairing code immediately
-      let pairingCode: string | undefined;
-      if (phoneNumber && phoneNumber.trim()) {
+      const usePairingCode = phoneNumber && phoneNumber.trim();
+
+      // Mobile flow: request pairing code only, no QR
+      if (usePairingCode) {
         try {
           // Format phone number
           const cleaned = phoneNumber.replace(/\D/g, '').replace(/^0+/, '');
@@ -74,20 +75,54 @@ class WhatsAppService extends EventEmitter {
           // Wait a bit for socket to be ready
           await new Promise(resolve => setTimeout(resolve, 3000));
 
-          pairingCode = await this.socket.requestPairingCode(phoneWithCountry);
+          const pairingCode = await this.socket.requestPairingCode(phoneWithCountry);
           logger.info(`Pairing code generated: ${pairingCode}`);
+
+          // Setup connection listener for pairing code flow
+          this.socket.ev.on('connection.update', async (update) => {
+            const { connection } = update;
+            if (connection === 'open') {
+              this.isConnected = true;
+              this.isConnecting = false;
+              this.qrCode = null;
+              this.reconnectAttempts = 0;
+              this.lastError = null;
+              logger.info('WhatsApp connected via pairing code');
+              this.emit('connected');
+            } else if (connection === 'close') {
+              this.isConnected = false;
+              this.isConnecting = false;
+              this.emit('disconnected');
+            }
+          });
+
+          // Save credentials on update
+          const { saveCreds } = await useMultiFileAuthState(this.authPath);
+          this.socket.ev.on('creds.update', saveCreds);
+
+          // Return pairing code only, no QR
+          return {
+            status: 'pairing_code_ready',
+            pairingCode,
+            qrCode: undefined
+          };
         } catch (err) {
+          this.isConnecting = false;
           logger.error('Failed to generate pairing code:', err);
+          return {
+            status: 'error',
+            error: `Failed to generate pairing code: ${(err as Error).message}`
+          };
         }
       }
 
-      // Create a promise that resolves when QR is generated or connection is established
+      // Desktop flow: use QR code only, no pairing code
       const connectionPromise = new Promise<{ qrCode?: string; pairingCode?: string; status: string; error?: string }>((resolve) => {
         const timeout = setTimeout(() => {
           resolve({
             status: this.isConnected ? 'connected' : 'timeout',
             qrCode: this.qrCode || undefined,
-            pairingCode,
+            pairingCode: undefined,
             error: this.isConnected ? undefined : 'Connection timeout - please try again'
           });
         }, 15000); // 15 second timeout
@@ -104,7 +139,7 @@ class WhatsAppService extends EventEmitter {
             resolve({
               status: 'qr_ready',
               qrCode: qr,
-              pairingCode
+              pairingCode: undefined
             });
           }
 
