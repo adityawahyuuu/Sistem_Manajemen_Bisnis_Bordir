@@ -1,0 +1,196 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model companies {
+  id         Int         @id @default(autoincrement())
+  user_id    Int
+  domain     String?     @db.VarChar(255)
+  is_active  Boolean     @default(true)
+  created_at DateTime?   @default(now()) @db.Timestamp(0)
+  updated_at DateTime?   @default(now()) @db.Timestamp(0)
+  deleted_at DateTime?   @db.Timestamp(0)
+  users      users       @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "fk_companies_user_id")
+  customers  customers[]
+  invoices   invoices[]
+  receipts   receipts[]
+  waybills   waybills[]
+
+  @@index([user_id], map: "fk_companies_user_id")
+}
+
+model customers {
+  id               Int        @id @default(autoincrement())
+  company_id       Int
+  name             String     @db.VarChar(255)
+  company_name     String?    @db.VarChar(255)
+  email            String?    @db.VarChar(255)
+  phone            String?    @db.VarChar(50)
+  whatsapp_numbers Json?
+  address          String?    @db.Text
+  city             String?    @default("Tasikmalaya") @db.VarChar(100)
+  province         String?    @default("Jawa Barat") @db.VarChar(100)
+  postal_code      String?    @db.VarChar(20)
+  created_at       DateTime?  @default(now()) @db.Timestamp(0)
+  updated_at       DateTime?  @default(now()) @db.Timestamp(0)
+  companies        companies  @relation(fields: [company_id], references: [id], onDelete: Cascade, map: "fk_customers_company_id")
+  invoices         invoices[]
+  receipts         receipts[]
+  waybills         waybills[]
+
+  @@index([company_id], map: "fk_customers_company_id")
+}
+
+model invoice_items {
+  id          Int       @id @default(autoincrement())
+  invoice_id  Int
+  item_name   String    @db.VarChar(255)
+  description String?   @db.Text
+  quantity    Int       @default(1)
+  unit_price  Decimal   @default(0.00) @db.Decimal(15, 2)
+  total_price Decimal   @default(0.00) @db.Decimal(15, 2)
+  created_at  DateTime? @default(now()) @db.Timestamp(0)
+  invoices    invoices  @relation(fields: [invoice_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_invoice_items_invoice_id")
+
+  @@index([invoice_id], map: "fk_invoice_items_invoice_id")
+}
+
+model invoices {
+  id                  Int             @id @default(autoincrement())
+  company_id          Int
+  customer_id         Int
+  invoice_number      String          @db.VarChar(100)
+  invoice_date        DateTime        @db.Date
+  due_date            DateTime?       @db.Date
+  subtotal            Decimal         @default(0.00) @db.Decimal(15, 2)
+  tax_amount          Decimal         @default(0.00) @db.Decimal(15, 2)
+  discount_amount     Decimal         @default(0.00) @db.Decimal(15, 2)
+  total_amount        Decimal         @default(0.00) @db.Decimal(15, 2)
+  status              invoices_status @default(draft)
+  notes               String?         @db.Text
+  generated_file_path String?         @db.VarChar(500)
+  created_by          Int
+  created_at          DateTime?       @default(now()) @db.Timestamp(0)
+  updated_at          DateTime?       @default(now()) @db.Timestamp(0)
+  invoice_items       invoice_items[]
+  companies           companies       @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_invoices_company_id")
+  users               users           @relation(fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_invoices_created_by")
+  customers           customers       @relation(fields: [customer_id], references: [id], onUpdate: NoAction, map: "fk_invoices_customer_id")
+  receipts            receipts[]
+  waybills            waybills[]
+
+  @@unique([company_id, invoice_number], map: "unique_invoice_number_per_company")
+  @@index([created_by], map: "fk_invoices_created_by")
+  @@index([customer_id], map: "fk_invoices_customer_id")
+}
+
+model receipts {
+  id                  Int                     @id @default(autoincrement())
+  company_id          Int
+  invoice_id          Int?
+  customer_id         Int
+  receipt_number      String                  @db.VarChar(100)
+  receipt_date        DateTime                @db.Date
+  amount              Decimal                 @default(0.00) @db.Decimal(15, 2)
+  payment_method      receipts_payment_method @default(cash)
+  description         String?                 @db.Text
+  received_by         String?                 @db.VarChar(255)
+  notes               String?                 @db.Text
+  generated_file_path String?                 @db.VarChar(500)
+  created_by          Int
+  created_at          DateTime?               @default(now()) @db.Timestamp(0)
+  updated_at          DateTime?               @default(now()) @db.Timestamp(0)
+  companies           companies               @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_receipts_company_id")
+  users               users                   @relation(fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_receipts_created_by")
+  customers           customers               @relation(fields: [customer_id], references: [id], onUpdate: NoAction, map: "fk_receipts_customer_id")
+  invoices            invoices?               @relation(fields: [invoice_id], references: [id], onUpdate: NoAction, map: "fk_receipts_invoice_id")
+
+  @@unique([company_id, receipt_number], map: "unique_receipt_number_per_company")
+  @@index([created_by], map: "fk_receipts_created_by")
+  @@index([customer_id], map: "fk_receipts_customer_id")
+  @@index([invoice_id], map: "fk_receipts_invoice_id")
+}
+
+model users {
+  id                Int         @id @default(autoincrement())
+  name              String      @db.VarChar(255)
+  email             String      @db.VarChar(255)
+  password          String      @db.VarChar(255)
+  last_logged_in_at DateTime?   @db.Timestamp(0)
+  is_active         Boolean     @default(true)
+  created_at        DateTime?   @default(now()) @db.Timestamp(0)
+  updated_at        DateTime?   @default(now()) @db.Timestamp(0)
+  deleted_at        DateTime?   @db.Timestamp(0)
+  companies         companies[]
+  invoices          invoices[]
+  receipts          receipts[]
+  waybills          waybills[]
+}
+
+model waybill_items {
+  id         Int       @id @default(autoincrement())
+  waybill_id Int
+  item_name  String    @db.VarChar(255)
+  quantity   Int       @default(1)
+  unit       String?   @default("pcs") @db.VarChar(50)
+  notes      String?   @db.Text
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  waybills   waybills  @relation(fields: [waybill_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_waybill_items_waybill_id")
+
+  @@index([waybill_id], map: "fk_waybill_items_waybill_id")
+}
+
+model waybills {
+  id                   Int             @id @default(autoincrement())
+  company_id           Int
+  invoice_id           Int?
+  customer_id          Int
+  waybill_number       String          @db.VarChar(100)
+  waybill_date         DateTime        @db.Date
+  destination_address  String          @db.Text
+  destination_city     String          @default("Tasikmalaya") @db.VarChar(100)
+  destination_province String          @default("Jawa Barat") @db.VarChar(100)
+  vehicle_number       String?         @db.VarChar(50)
+  driver_name          String?         @db.VarChar(255)
+  notes                String?         @db.Text
+  status               waybills_status @default(pending)
+  generated_file_path  String?         @db.VarChar(500)
+  created_by           Int
+  created_at           DateTime?       @default(now()) @db.Timestamp(0)
+  updated_at           DateTime?       @default(now()) @db.Timestamp(0)
+  waybill_items        waybill_items[]
+  companies            companies       @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_waybills_company_id")
+  users                users           @relation(fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_waybills_created_by")
+  customers            customers       @relation(fields: [customer_id], references: [id], onUpdate: NoAction, map: "fk_waybills_customer_id")
+  invoices             invoices?       @relation(fields: [invoice_id], references: [id], onUpdate: NoAction, map: "fk_waybills_invoice_id")
+
+  @@unique([company_id, waybill_number], map: "unique_waybill_number_per_company")
+  @@index([created_by], map: "fk_waybills_created_by")
+  @@index([customer_id], map: "fk_waybills_customer_id")
+  @@index([invoice_id], map: "fk_waybills_invoice_id")
+}
+
+enum receipts_payment_method {
+  cash
+  transfer
+  check
+  other
+}
+
+enum invoices_status {
+  draft
+  sent
+  paid
+  cancelled
+}
+
+enum waybills_status {
+  pending
+  in_transit
+  delivered
+}

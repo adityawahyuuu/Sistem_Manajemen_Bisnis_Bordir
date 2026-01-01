@@ -1,9 +1,9 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import swaggerUi from 'swagger-ui-express';
-import { appConfig, swaggerSpec } from './config';
+import { appConfig, generateSwaggerSpec } from './config';
 import routes from './routes';
 import { errorHandler, notFoundHandler, generalLimiter } from './middleware';
 import { logger } from './shared/utils/logger.util';
@@ -34,14 +34,24 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Swagger documentation
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-  explorer: true,
-  customSiteTitle: 'Bordir API Documentation',
-}));
+// Swagger documentation - setup with async generated spec
+let swaggerSpec: any = null;
+
+app.use('/api-docs', swaggerUi.serve, async (req: Request, res: Response, next: NextFunction) => {
+  if (!swaggerSpec) {
+    swaggerSpec = await generateSwaggerSpec();
+  }
+  swaggerUi.setup(swaggerSpec, {
+    explorer: true,
+    customSiteTitle: 'Bordir API Documentation',
+  })(req, res, next);
+});
 
 // Swagger JSON endpoint
-app.get('/api-docs.json', (req, res) => {
+app.get('/api-docs.json', async (req, res) => {
+  if (!swaggerSpec) {
+    swaggerSpec = await generateSwaggerSpec();
+  }
   res.setHeader('Content-Type', 'application/json');
   res.send(swaggerSpec);
 });

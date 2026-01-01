@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import Router from 'express';
 import authRoutes from '../modules/auth/auth.routes';
 import customerRoutes from '../modules/customers/customer.routes';
 import invoiceRoutes from '../modules/invoices/invoice.routes';
@@ -8,7 +8,7 @@ import whatsappRoutes from '../modules/whatsapp/whatsapp.routes';
 
 const router = Router();
 
-router.use('/auth', authRoutes);
+router.use('/auth', authRoutes)
 router.use('/customers', customerRoutes);
 router.use('/invoices', invoiceRoutes);
 router.use('/waybills', waybillRoutes);

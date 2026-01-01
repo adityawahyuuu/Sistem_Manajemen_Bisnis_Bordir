@@ -3,16 +3,38 @@ import { authService } from '../services/auth.service';
 import { sendSuccess, sendCreated, sendBadRequest } from '../../../shared/utils/response.util';
 
 export const authController = {
-  async login(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { email, password } = req.body;
+  // async login(req: Request, res: Response, next: NextFunction) {
+  //   try {
+  //     const {email, password} = req.body;
+  //
+  //     if (!email || !password) {
+  //       return sendBadRequest(res, 'Email and password are required');
+  //     }
+  //
+  //     const result = await authService.login(email, password);
+  //     sendSuccess(res, result, 'Login successful');
+  //   } catch (error) {
+  //     next(error);
+  //   }
+  // },
 
-      if (!email || !password) {
-        return sendBadRequest(res, 'Email and password are required');
+  async register(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { name, email, password } = req.body;
+
+      // Check if email already exists
+      const emailExists = await authService.checkIsAnyEmail(email);
+      if (emailExists) {
+        return sendBadRequest(res, 'Email already exists');
       }
 
-      const result = await authService.login(email, password);
-      sendSuccess(res, result, 'Login successful');
+      // Create user with hashed password
+      const user = await authService.createUser(name, email, password);
+
+      // TODO: create send email service to verify user
+
+      // Return user data without password
+      sendCreated(res, user, 'User registered successfully');
     } catch (error) {
       next(error);
     }
@@ -33,46 +55,46 @@ export const authController = {
     }
   },
 
-  async profile(req: Request, res: Response, next: NextFunction) {
-    try {
-      const result = await authService.getProfile(req.user!.id);
-      sendSuccess(res, result);
-    } catch (error) {
-      next(error);
-    }
-  },
+  // async profile(req: Request, res: Response, next: NextFunction) {
+  //   try {
+  //     const result = await authService.getProfile(req.user!.id);
+  //     sendSuccess(res, result);
+  //   } catch (error) {
+  //     next(error);
+  //   }
+  // },
 
-  async createProfile(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { full_name } = req.body;
-      const result = await authService.createUserProfile(
-        req.user!.id,
-        req.user!.email,
-        full_name
-      );
-      sendCreated(res, result, 'Profile created');
-    } catch (error) {
-      next(error);
-    }
-  },
+  // async createProfile(req: Request, res: Response, next: NextFunction) {
+  //   try {
+  //     const { full_name } = req.body;
+  //     const result = await authService.createUserProfile(
+  //       req.user!.id,
+  //       req.user!.email,
+  //       full_name
+  //     );
+  //     sendCreated(res, result, 'Profile created');
+  //   } catch (error) {
+  //     next(error);
+  //   }
+  // },
 
-  async setRole(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { userId } = req.params;
-      const { role } = req.body;
-      const result = await authService.setUserRole(userId, role);
-      sendSuccess(res, result, 'Role updated');
-    } catch (error) {
-      next(error);
-    }
-  },
+  // async setRole(req: Request, res: Response, next: NextFunction) {
+  //   try {
+  //     const { userId } = req.params;
+  //     const { role } = req.body;
+  //     const result = await authService.setUserRole(userId, role);
+  //     sendSuccess(res, result, 'Role updated');
+  //   } catch (error) {
+  //     next(error);
+  //   }
+  // },
 
-  async getAllUsers(req: Request, res: Response, next: NextFunction) {
-    try {
-      const users = await authService.getAllUsers();
-      sendSuccess(res, users);
-    } catch (error) {
-      next(error);
-    }
-  },
+  // async getAllUsers(req: Request, res: Response, next: NextFunction) {
+  //   try {
+  //     const users = await authService.getAllUsers();
+  //     sendSuccess(res, users);
+  //   } catch (error) {
+  //     next(error);
+  //   }
+  // },
 };

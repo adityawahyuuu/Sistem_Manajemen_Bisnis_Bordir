@@ -33,3 +33,5 @@ coverage/
 # Misc
 *.swp
 *.swo
+
+prisma/generated/

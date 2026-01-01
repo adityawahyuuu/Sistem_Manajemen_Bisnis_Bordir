@@ -1,9 +1,9 @@
 import swaggerJsdoc from 'swagger-jsdoc';
 import { appConfig } from './app.config';
+import path from 'path';
 
 const getServerUrl = (): string => {
   if (appConfig.env === 'production') {
-    // Use RENDER_EXTERNAL_URL if available, otherwise use generic production URL
     return process.env.RENDER_EXTERNAL_URL || process.env.API_URL || 'https://your-app.onrender.com';
   }
   return `http://localhost:${appConfig.port}`;
@@ -122,7 +122,22 @@ const options: swaggerJsdoc.Options = {
       },
     ],
   },
-  apis: ['./src/modules/**/*.routes.ts', './src/routes/*.ts'],
+  // Use TypeScript files in development, JavaScript files in production
+  apis: process.env.NODE_ENV === 'production' || !__filename.endsWith('.ts')
+    ? [
+        path.join(__dirname, '../modules/auth/auth.routes.js'),
+        path.join(__dirname, '../routes/*.js')
+      ]
+    : [
+        path.join(__dirname, '../modules/auth/auth.routes.ts'),
+        path.join(__dirname, '../routes/*.ts')
+      ],
 };
 
-export const swaggerSpec = swaggerJsdoc(options);
+// Export function to generate swagger spec asynchronously
+export async function generateSwaggerSpec() {
+  return await swaggerJsdoc(options);
+}
+
+// For backward compatibility, export synchronous version that returns Promise
+export const swaggerSpec = generateSwaggerSpec();
