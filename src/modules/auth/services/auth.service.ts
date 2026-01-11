@@ -59,6 +59,22 @@ export const authService = {
     return isAnyEmail;
   },
 
+  async getUserByEmail(email: string) {
+    const user = await prisma.users.findFirst({
+      where: {
+        email: email,
+      },
+    });
+
+    if (!user) {
+      return null;
+    }
+
+    // Remove password from response
+    const { password: _, ...userWithoutPassword } = user;
+    return userWithoutPassword;
+  },
+
   async createUser(name: string, email: string, password: string) {
     // Hash password before storing
     const hashedPassword = await hashingUtil.hashPassword(password);
@@ -78,6 +94,34 @@ export const authService = {
     const { password: _, ...userWithoutPassword } = result;
 
     return userWithoutPassword;
+  },
+
+  async activateUser(email: string) {
+    const user = await prisma.users.findFirst({
+      where: {
+        email: email,
+      },
+    });
+
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    if (user.is_active) {
+      throw new AppError('User account is already active', 400);
+    }
+
+    await prisma.users.update({
+      where: {
+        id: user.id,
+      },
+      data: {
+        is_active: true,
+        updated_at: new Date(),
+      },
+    });
+
+    return true;
   },
 
   // async login(email: string, password: string) {
@@ -176,5 +220,78 @@ export const authService = {
       refreshToken: data.refresh_token,
       expiresIn: data.expires_in,
     };
+  },
+
+  async resetPassword(email: string, newPassword: string) {
+    const user = await prisma.users.findFirst({
+      where: {
+        email: email,
+      },
+    });
+
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    // Hash new password
+    const hashedPassword = await hashingUtil.hashPassword(newPassword);
+
+    // Update password
+    await prisma.users.update({
+      where: {
+        id: user.id,
+      },
+      data: {
+        password: hashedPassword,
+        updated_at: new Date(),
+      },
+    });
+
+    return true;
+  },
+
+  async login(email: string, password: string) {
+    // Find user by email
+    const user = await prisma.users.findFirst({
+      where: {
+        email: email,
+      },
+    });
+
+    // OWASP: Return generic error message to prevent user enumeration
+    if (!user) {
+      throw new AppError('Invalid email or password', 401);
+    }
+
+    // Check if account is active
+    if (!user.is_active) {
+      throw new AppError('Account is not activated. Please verify your email.', 403);
+    }
+
+    // Verify password using constant-time comparison
+    const isPasswordValid = await hashingUtil.comparePassword(
+      password,
+      user.password
+    );
+
+    if (!isPasswordValid) {
+      throw new AppError('Invalid email or password', 401);
+    }
+
+    // Update last logged in timestamp
+    await prisma.users.update({
+      where: {
+        id: user.id,
+      },
+      data: {
+        last_logged_in_at: new Date(),
+        updated_at: new Date(),
+      },
+    });
+
+    // Remove password from response
+    const { password: _, ...userWithoutPassword } = user;
+
+    return userWithoutPassword;
   },
 };

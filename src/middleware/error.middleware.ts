@@ -16,7 +16,7 @@ export class AppError extends Error {
 }
 
 export const errorHandler = (
-  err: Error | AppError,
+  err: any,
   req: Request,
   res: Response,
   _next: NextFunction
@@ -27,7 +27,24 @@ export const errorHandler = (
     return sendError(res, err.message, err.statusCode);
   }
 
+  // Prisma errors
+  if (err.code === 'P2002'){  // Unique constraint violation
+    return sendError(res, 'Email already exists', 409);
+  }
+
+  if (err.code === 'P2025') {  // Record not found
+    return sendError(res, 'Resource not found', 404);
+  }
+
+  if (err.code === 'P2003') {  // Foreign key constraint
+    return sendError(res, 'Referenced resource not found', 400);
+  }
+
   // Database errors
+  if (err.code?.startsWith('P1')) {  // P1xxx = connection errors
+    return sendError(res, 'Database connection error', 503);
+  }
+  
   if (err.message.includes('duplicate key')) {
     return sendError(res, 'Resource already exists', 409);
   }

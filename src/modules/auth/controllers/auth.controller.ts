@@ -1,22 +1,93 @@
 import { Request, Response, NextFunction } from 'express';
 import { authService } from '../services/auth.service';
-import { sendSuccess, sendCreated, sendBadRequest } from '../../../shared/utils/response.util';
+import {
+  sendAuthSuccessWithDates,
+  sendBadRequest,
+  sendCreatedWithDates,
+  sendSuccessWithDates,
+} from '../../../shared/utils/response.util';
+import { otpService } from '../../../shared/services/otp.service';
+import { emailService } from '../../../shared/services/email.service';
+import { passwordResetService } from '../../../shared/services/password-reset.service';
+import { loginAttemptService } from '../../../shared/services/login-attempt.service';
+import { AppError } from '../../../middleware/error.middleware';
+import { jwtService } from '../../../shared/services/jwt.service';
+import { ROLES } from '../../../shared/constants/roles.constant'
 
 export const authController = {
-  // async login(req: Request, res: Response, next: NextFunction) {
-  //   try {
-  //     const {email, password} = req.body;
-  //
-  //     if (!email || !password) {
-  //       return sendBadRequest(res, 'Email and password are required');
-  //     }
-  //
-  //     const result = await authService.login(email, password);
-  //     sendSuccess(res, result, 'Login successful');
-  //   } catch (error) {
-  //     next(error);
-  //   }
-  // },
+  async login(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email, password } = req.body;
+      const ipAddress = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'unknown';
+      const userAgent = req.headers['user-agent'];
+
+      // Check if account is locked
+      const isLocked = await loginAttemptService.isAccountLocked(email);
+      if (isLocked) {
+        const remainingTime = await loginAttemptService.getLockoutRemainingTime(email);
+        await loginAttemptService.recordAttempt(
+          email,
+          ipAddress,
+          userAgent,
+          false,
+          'Account locked'
+        );
+
+        throw new AppError(
+          `Account is temporarily locked due to multiple failed login attempts. Please try again in ${remainingTime} minutes.`,
+          429
+        );
+      }
+
+      // Attempt login
+      try {
+        const user = await authService.login(email, password);
+        const token = jwtService.sign({
+          sub: 'user-id-123',
+          email,
+          role: ROLES.USER,
+        });
+
+        // Record successful attempt
+        await loginAttemptService.recordAttempt(
+          email,
+          ipAddress,
+          userAgent,
+          true
+        );
+
+        // Return user data with dates converted to Jakarta timezone
+        sendAuthSuccessWithDates(res, user, { accessToken: token }, 'Login successful');
+      } catch (error: any) {
+        // Record failed attempt
+        const failureReason = error instanceof AppError ? error.message : 'Invalid credentials';
+        await loginAttemptService.recordAttempt(
+          email,
+          ipAddress,
+          userAgent,
+          false,
+          failureReason
+        );
+
+        // Check if this failure causes lockout
+        const failedCount = await loginAttemptService.getFailedAttemptCount(email);
+        const config = loginAttemptService.getConfig();
+        const remainingAttempts = config.maxAttempts - failedCount;
+
+        if (remainingAttempts > 0 && remainingAttempts <= 2) {
+          // Warn user about remaining attempts
+          throw new AppError(
+            `Invalid email or password. ${remainingAttempts} attempt(s) remaining before account lockout.`,
+            401
+          );
+        }
+
+        throw error;
+      }
+    } catch (error) {
+      next(error);
+    }
+  },
 
   async register(req: Request, res: Response, next: NextFunction) {
     try {
@@ -31,10 +102,67 @@ export const authController = {
       // Create user with hashed password
       const user = await authService.createUser(name, email, password);
 
-      // TODO: create send email service to verify user
+      // Generate OTP code
+      const otpCode = await otpService.createOTP(email, 'email_verification');
 
-      // Return user data without password
-      sendCreated(res, user, 'User registered successfully');
+      // Send OTP via email
+      await emailService.sendOTP(email, otpCode, name);
+
+      // Return user data without password (dates converted to Jakarta timezone)
+      sendCreatedWithDates(
+        res,
+        {
+          ...user,
+          message: 'User registered successfully. Please check your email for verification code.'
+        },
+        'Registration successful. Verification email sent.'
+      );
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async verifyEmail(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email, otp_code } = req.body;
+
+      // Verify OTP
+      await otpService.verifyOTP(email, otp_code, 'email_verification');
+
+      // Activate user account
+      await authService.activateUser(email);
+
+      sendSuccessWithDates(res, { email, is_active: true }, 'Email verified successfully. Your account is now active.');
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async resendOTP(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email } = req.body;
+
+      // Check if email exists
+      const emailExists = await authService.checkIsAnyEmail(email);
+      if (!emailExists) {
+        return sendBadRequest(res, 'Email not found');
+      }
+
+      // Get user info
+      const user = await authService.getUserByEmail(email);
+
+      // Check if already verified
+      if (user?.is_active) {
+        return sendBadRequest(res, 'Email is already verified');
+      }
+
+      // Generate new OTP
+      const otpCode = await otpService.resendOTP(email, 'email_verification');
+
+      // Send OTP via email
+      await emailService.sendOTP(email, otpCode, user?.name || 'User');
+
+      sendSuccessWithDates(res, { email }, 'Verification code has been resent to your email.');
     } catch (error) {
       next(error);
     }
@@ -49,7 +177,65 @@ export const authController = {
       }
 
       const result = await authService.refreshToken(refreshToken);
-      sendSuccess(res, result, 'Token refreshed successfully');
+      sendSuccessWithDates(res, result, 'Token refreshed successfully');
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async forgotPassword(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email } = req.body;
+
+      // Check if user exists (following OWASP: return consistent message)
+      const userExists = await authService.checkIsAnyEmail(email);
+
+      if (userExists) {
+        // Get user info
+        const user = await authService.getUserByEmail(email);
+
+        // Generate reset token
+        const resetToken = await passwordResetService.createResetToken(email);
+
+        // Send reset email
+        const expiryHours = passwordResetService.getTokenExpiryHours();
+        await emailService.sendPasswordResetEmail(
+          email,
+          resetToken,
+          user?.name || 'User',
+          expiryHours
+        );
+      }
+
+      // OWASP Security: Always return same message to prevent user enumeration
+      sendSuccessWithDates(
+        res,
+        { email },
+        'If an account exists with this email, you will receive a password reset link shortly.'
+      );
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async resetPassword(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { token, password } = req.body;
+
+      // Verify token and get email
+      const email = await passwordResetService.verifyResetToken(token);
+
+      // Reset password
+      await authService.resetPassword(email, password);
+
+      // Mark token as used
+      await passwordResetService.markTokenAsUsed(token);
+
+      sendSuccessWithDates(
+        res,
+        { email },
+        'Password has been reset successfully. You can now login with your new password.'
+      );
     } catch (error) {
       next(error);
     }
