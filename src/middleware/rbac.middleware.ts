@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { Role } from '../shared/constants/roles.constant';
+import { Role, ROLES } from '../shared/constants/roles.constant';
 import { sendForbidden, sendUnauthorized } from '../shared/utils/response.util';
 
 export const requireRole = (...roles: Role[]) => {
@@ -16,4 +16,4 @@ export const requireRole = (...roles: Role[]) => {
   };
 };
 
-export const requireAdmin = requireRole('admin');
+export const requireAdmin = requireRole(ROLES.ADMIN);

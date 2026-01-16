@@ -32,7 +32,7 @@ const options: swaggerJsdoc.Options = {
           type: 'http',
           scheme: 'bearer',
           bearerFormat: 'JWT',
-          description: 'Enter Firebase ID token',
+          description: 'Enter JWT access token received from /auth/login endpoint',
         },
       },
       schemas: {
@@ -126,10 +126,14 @@ const options: swaggerJsdoc.Options = {
   apis: process.env.NODE_ENV === 'production' || !__filename.endsWith('.ts')
     ? [
         path.join(__dirname, '../modules/auth/auth.routes.js'),
+        path.join(__dirname, '../modules/companies/companies.routes.js'),
+        path.join(__dirname, '../modules/items/items.routes.js'),
         path.join(__dirname, '../routes/*.js')
       ]
     : [
         path.join(__dirname, '../modules/auth/auth.routes.ts'),
+        path.join(__dirname, '../modules/companies/companies.routes.ts'),
+        path.join(__dirname, '../modules/items/items.routes.ts'),
         path.join(__dirname, '../routes/*.ts')
       ],
 };

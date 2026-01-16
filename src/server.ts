@@ -1,6 +1,6 @@
 import app from './app';
 import { appConfig } from './config';
-import { testConnection } from './database/firebase';
+import { prisma } from './database/prisma.client';
 import { logger } from './shared/utils/logger.util';
 import fs from 'fs';
 import path from 'path';
@@ -16,18 +16,17 @@ dirs.forEach(dir => {
 
 const startServer = async () => {
   try {
-    // Test Firebase connection
-    const connected = await testConnection();
-    if (!connected) {
-      logger.error('Failed to connect to Firebase');
-      process.exit(1);
-    }
+    // Test database connection
+    await prisma.$connect();
+    logger.info('✅ Database connected successfully');
 
     app.listen(appConfig.port, () => {
       logger.info(`Server running on port ${appConfig.port}`);
       logger.info(`Environment: ${appConfig.env}`);
       logger.info(`API Prefix: ${appConfig.apiPrefix}`);
     });
+
+    logger.info('Database connection test completed');
   } catch (error) {
     logger.error('Failed to start server:', error);
     process.exit(1);

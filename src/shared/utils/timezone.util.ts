@@ -188,8 +188,9 @@ export const timezoneUtil = {
     const converted = { ...obj };
 
     for (const field of dateFields) {
-      if (converted[field] instanceof Date || typeof converted[field] === 'string') {
-        const jakartaDate = this.utcToJakarta(converted[field] as Date | string);
+      const value: any = converted[field];
+      if (typeof value === 'string' || value instanceof Date) {
+        const jakartaDate = this.utcToJakarta(value as Date | string);
         converted[field] = jakartaDate as any;
       }
     }
@@ -212,8 +213,9 @@ export const timezoneUtil = {
     const converted = { ...obj };
 
     for (const field of dateFields) {
-      if (converted[field] instanceof Date || typeof converted[field] === 'string') {
-        const utcDate = this.jakartaToUtc(converted[field] as Date | string);
+      const value: any = converted[field];
+      if (typeof value === 'string' || value instanceof Date) {
+        const utcDate = this.jakartaToUtc(value as Date | string);
         converted[field] = utcDate as any;
       }
     }

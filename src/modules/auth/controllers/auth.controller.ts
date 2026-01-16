@@ -12,7 +12,8 @@ import { passwordResetService } from '../../../shared/services/password-reset.se
 import { loginAttemptService } from '../../../shared/services/login-attempt.service';
 import { AppError } from '../../../middleware/error.middleware';
 import { jwtService } from '../../../shared/services/jwt.service';
-import { ROLES } from '../../../shared/constants/roles.constant'
+import { ROLES, Role } from '../../../shared/constants/roles.constant';
+import { prisma } from '../../../config/prisma';
 
 export const authController = {
   async login(req: Request, res: Response, next: NextFunction) {
@@ -42,11 +43,16 @@ export const authController = {
       // Attempt login
       try {
         const user = await authService.login(email, password);
-        const token = jwtService.sign({
-          sub: 'user-id-123',
-          email,
-          role: ROLES.USER,
+
+        // Generate access token (short-lived: 15 minutes)
+        const accessToken = jwtService.sign({
+          sub: user.id.toString(),
+          email: user.email,
+          role: (user.role || ROLES.USER) as Role,
         });
+
+        // Generate refresh token (long-lived: 7 days, stored in DB)
+        const refreshToken = await jwtService.generateRefreshToken(user.id);
 
         // Record successful attempt
         await loginAttemptService.recordAttempt(
@@ -56,8 +62,16 @@ export const authController = {
           true
         );
 
-        // Return user data with dates converted to Jakarta timezone
-        sendAuthSuccessWithDates(res, user, { accessToken: token }, 'Login successful');
+        // Return user data with tokens
+        sendAuthSuccessWithDates(
+          res,
+          user,
+          {
+            accessToken,
+            refreshToken,
+          },
+          'Login successful'
+        );
       } catch (error: any) {
         // Record failed attempt
         const failureReason = error instanceof AppError ? error.message : 'Invalid credentials';
@@ -176,8 +190,36 @@ export const authController = {
         return sendBadRequest(res, 'Refresh token is required');
       }
 
-      const result = await authService.refreshToken(refreshToken);
-      sendSuccessWithDates(res, result, 'Token refreshed successfully');
+      // Verify refresh token and generate new access token
+      const result = await jwtService.refreshAccessToken(refreshToken);
+
+      sendSuccessWithDates(
+        res,
+        {
+          accessToken: result.accessToken,
+          user: {
+            id: result.user.sub,
+            email: result.user.email,
+            role: result.user.role,
+          },
+        },
+        'Token refreshed successfully'
+      );
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async logout(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { refreshToken } = req.body;
+
+      if (refreshToken) {
+        // Revoke the refresh token
+        await jwtService.revokeRefreshToken(refreshToken);
+      }
+
+      sendSuccessWithDates(res, null, 'Logged out successfully');
     } catch (error) {
       next(error);
     }
@@ -241,14 +283,33 @@ export const authController = {
     }
   },
 
-  // async profile(req: Request, res: Response, next: NextFunction) {
-  //   try {
-  //     const result = await authService.getProfile(req.user!.id);
-  //     sendSuccess(res, result);
-  //   } catch (error) {
-  //     next(error);
-  //   }
-  // },
+  async profile(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = parseInt(req.user!.id);
+
+      const user = await prisma.users.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          is_active: true,
+          created_at: true,
+          updated_at: true,
+          last_logged_in_at: true,
+        },
+      });
+
+      if (!user) {
+        throw new AppError('User not found', 404);
+      }
+
+      sendSuccessWithDates(res, user, 'Profile retrieved successfully');
+    } catch (error) {
+      next(error);
+    }
+  },
 
   // async createProfile(req: Request, res: Response, next: NextFunction) {
   //   try {

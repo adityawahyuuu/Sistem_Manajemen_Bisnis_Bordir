@@ -4,7 +4,7 @@ import { sendSuccess, sendFail } from '../../../shared/utils/response.util';
 import { invoiceService } from '../../invoices/services/invoice.service';
 import { receiptService } from '../../receipts/services/receipt.service';
 import { waybillService } from '../../waybills/services/waybill.service';
-import { customerRepository } from '../../customers/repositories/customer.repository';
+// import { customerRepository } from '../../customers/repositories/customer.repository'; // TODO: Migrate to Prisma
 import * as QRCode from 'qrcode';
 
 export const whatsappController = {
@@ -266,12 +266,14 @@ export const whatsappController = {
 
 // Helper function to get customer phone
 async function getCustomerPhone(customerId: string): Promise<string | null> {
-  const customer = await customerRepository.findById(customerId);
-  if (!customer) return null;
+  // TODO: Migrate to Prisma customerService
+  // const customer = await customerRepository.findById(customerId);
+  // if (!customer) return null;
 
-  // Try WhatsApp numbers first, then regular phone
-  if (customer.whatsapp_numbers && customer.whatsapp_numbers.length > 0) {
-    return customer.whatsapp_numbers[0];
-  }
-  return customer.phone || null;
+  // // Try WhatsApp numbers first, then regular phone
+  // if (customer.whatsapp_numbers && customer.whatsapp_numbers.length > 0) {
+  //   return customer.whatsapp_numbers[0];
+  // }
+  // return customer.phone || null;
+  return null; // Temporary placeholder
 }

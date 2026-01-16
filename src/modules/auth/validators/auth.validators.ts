@@ -61,7 +61,17 @@ export const registerSchema = Joi.object({
 });
 
 export const refreshTokenSchema = Joi.object({
-  refreshToken: Joi.string().required(),
+  refreshToken: Joi.string()
+    .min(1)
+    .required()
+    .messages({
+      'any.required': 'Refresh token is required',
+      'string.empty': 'Refresh token cannot be empty',
+    }),
+});
+
+export const logoutSchema = Joi.object({
+  refreshToken: Joi.string().optional(),
 });
 
 export const verifyEmailSchema = Joi.object({

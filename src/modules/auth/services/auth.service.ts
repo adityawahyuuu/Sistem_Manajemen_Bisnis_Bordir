@@ -1,6 +1,4 @@
-import { auth, db } from '../../../database/firebase';
 import { AppError } from '../../../middleware';
-import { firebaseConfig } from '../../../config';
 import { prisma } from '../../../config/prisma';
 import { hashingUtil } from '../../../shared/utils/hashing.util';
 
@@ -185,42 +183,6 @@ export const authService = {
   //     },
   //   };
   // },
-
-  async refreshToken(refreshToken: string) {
-    if (!firebaseConfig.apiKey) {
-      throw new AppError('Firebase API key not configured', 500);
-    }
-
-    const url = `https://securetoken.googleapis.com/v1/token?key=${firebaseConfig.apiKey}`;
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        grant_type: 'refresh_token',
-        refresh_token: refreshToken,
-      }),
-    });
-
-    const data = await response.json() as {
-      id_token?: string;
-      refresh_token?: string;
-      expires_in?: string;
-      error?: { message?: string };
-    };
-
-    if (!response.ok) {
-      throw new AppError('Invalid refresh token', 401);
-    }
-
-    return {
-      token: data.id_token,
-      refreshToken: data.refresh_token,
-      expiresIn: data.expires_in,
-    };
-  },
 
   async resetPassword(email: string, newPassword: string) {
     const user = await prisma.users.findFirst({

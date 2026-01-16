@@ -9,13 +9,6 @@ export const appConfig = {
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3001',
 };
 
-export const firebaseConfig = {
-  projectId: process.env.FIREBASE_PROJECT_ID || '',
-  clientEmail: process.env.FIREBASE_CLIENT_EMAIL || '',
-  privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
-  apiKey: process.env.FIREBASE_API_KEY || '',
-};
-
 export const rateLimitConfig = {
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10),
   max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
