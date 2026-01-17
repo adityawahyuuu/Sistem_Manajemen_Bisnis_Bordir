@@ -74,7 +74,7 @@ class EmailService {
       const transporter = await this.getTransporter();
 
       // Construct reset URL (using environment variable for base URL)
-      const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
       const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
 
       const mailOptions = {
