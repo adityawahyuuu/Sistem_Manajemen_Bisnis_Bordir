@@ -1,6 +1,9 @@
+import { invoices_status } from '../../../../prisma/generated/prisma';
+
 export interface Invoice {
-  id: string;
-  customer_id: string;
+  id: number;
+  company_id: number;
+  customer_id: number;
   invoice_number: string;
   invoice_date: Date;
   due_date?: Date | null;
@@ -8,28 +11,28 @@ export interface Invoice {
   tax_amount: number;
   discount_amount: number;
   total_amount: number;
-  status: string;
+  status: invoices_status;
   notes?: string | null;
   generated_file_path?: string | null;
-  created_by?: string | null;
-  created_at: Date;
-  updated_at: Date;
+  created_by: number;
+  created_at?: Date | null;
+  updated_at?: Date | null;
 }
 
 export interface InvoiceItem {
-  id: string;
-  invoice_id: string;
+  id: number;
+  invoice_id: number;
   item_name: string;
-  description?: string;
+  description?: string | null;
   quantity: number;
-  unit?: string;
   unit_price: number;
   total_price: number;
-  created_at: Date;
+  created_at?: Date | null;
 }
 
 export interface CreateInvoiceDto {
-  customer_id: string;
+  company_id: number;
+  customer_id: number;
   invoice_date?: string;
   due_date?: string;
   tax_amount?: number;
@@ -39,6 +42,7 @@ export interface CreateInvoiceDto {
 }
 
 export interface CreateInvoiceItemDto {
+  item_id?: number;
   name: string;
   description?: string;
   quantity: number;
@@ -51,5 +55,36 @@ export interface UpdateInvoiceDto {
   tax_amount?: number;
   discount_amount?: number;
   notes?: string;
-  status?: string;
+  status?: invoices_status;
+}
+
+export interface InvoiceWithItems extends Invoice {
+  invoice_items: InvoiceItem[];
+  customers?: {
+    id: number;
+    name: string;
+    company_name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    city?: string | null;
+    province?: string | null;
+  };
+  companies?: {
+    id: number;
+    name: string;
+    address?: string | null;
+    city?: string | null;
+    province?: string | null;
+    phone?: string | null;
+    email?: string | null;
+  };
+}
+
+export interface InvoiceQueryParams {
+  page?: number;
+  limit?: number;
+  status?: invoices_status;
+  customer_id?: number;
+  search?: string;
 }

@@ -2,18 +2,43 @@ import { Request, Response, NextFunction } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
 import { invoiceService } from '../services/invoice.service';
-import { sendSuccess, sendCreated, sendFail } from '../../../shared/utils/response.util';
+import {
+  sendSuccess,
+  sendCreated,
+  sendFail,
+  sendSuccessWithDates,
+  sendCreatedWithDates,
+} from '../../../shared/utils/response.util';
+import { invoices_status } from '../../../../prisma/generated/prisma';
 
 export const invoiceController = {
-  async findAll(req: Request, res: Response, next: NextFunction) {
+  /**
+   * Get all invoices for a company
+   * GET /invoices/company/:companyId
+   */
+  async findAllByCompany(req: Request, res: Response, next: NextFunction) {
     try {
+      const companyId = parseInt(req.params.companyId);
+      const userId = parseInt(req.user!.id);
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
-      const status = req.query.status as string;
-      const customerId = req.query.customer_id as string;
+      const status = req.query.status as invoices_status | undefined;
+      const customerId = req.query.customer_id
+        ? parseInt(req.query.customer_id as string)
+        : undefined;
+      const search = req.query.search as string | undefined;
 
-      const { data, total } = await invoiceService.findAll(page, limit, status, customerId);
-      sendSuccess(res, data, 'Invoices retrieved', 200, {
+      const { data, total } = await invoiceService.findAllByCompany(
+        companyId,
+        userId,
+        page,
+        limit,
+        status,
+        customerId,
+        search
+      );
+
+      sendSuccessWithDates(res, data, 'Invoices retrieved', 200, {
         page,
         limit,
         total,
@@ -24,57 +49,112 @@ export const invoiceController = {
     }
   },
 
+  /**
+   * Get invoice by ID
+   * GET /invoices/company/:companyId/:id
+   */
   async findById(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await invoiceService.findById(req.params.id);
-      sendSuccess(res, result);
+      const id = parseInt(req.params.id);
+      const companyId = parseInt(req.params.companyId);
+      const userId = parseInt(req.user!.id);
+
+      const invoice = await invoiceService.findById(id, companyId, userId);
+      sendSuccessWithDates(res, invoice, 'Invoice retrieved');
     } catch (error) {
       next(error);
     }
   },
 
+  /**
+   * Create new invoice
+   * POST /invoices/company/:companyId
+   */
   async create(req: Request, res: Response, next: NextFunction) {
     try {
-      const invoice = await invoiceService.create(req.body, req.user?.id);
-      sendCreated(res, invoice, 'Invoice created');
+      const companyId = parseInt(req.params.companyId);
+      const userId = parseInt(req.user!.id);
+
+      const invoice = await invoiceService.create(companyId, userId, {
+        ...req.body,
+        company_id: companyId,
+      });
+
+      sendCreatedWithDates(res, invoice, 'Invoice created');
     } catch (error) {
       next(error);
     }
   },
 
+  /**
+   * Update invoice
+   * PUT /invoices/company/:companyId/:id
+   */
   async update(req: Request, res: Response, next: NextFunction) {
     try {
-      const invoice = await invoiceService.update(req.params.id, req.body);
-      sendSuccess(res, invoice, 'Invoice updated');
+      const id = parseInt(req.params.id);
+      const companyId = parseInt(req.params.companyId);
+      const userId = parseInt(req.user!.id);
+
+      const invoice = await invoiceService.update(id, companyId, userId, req.body);
+      sendSuccessWithDates(res, invoice, 'Invoice updated');
     } catch (error) {
       next(error);
     }
   },
 
+  /**
+   * Delete invoice
+   * DELETE /invoices/company/:companyId/:id
+   */
   async delete(req: Request, res: Response, next: NextFunction) {
     try {
-      await invoiceService.delete(req.params.id);
+      const id = parseInt(req.params.id);
+      const companyId = parseInt(req.params.companyId);
+      const userId = parseInt(req.user!.id);
+
+      await invoiceService.delete(id, companyId, userId);
       sendSuccess(res, null, 'Invoice deleted');
     } catch (error) {
       next(error);
     }
   },
 
+  /**
+   * Generate PDF for invoice
+   * POST /invoices/company/:companyId/:id/generate
+   */
   async generate(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await invoiceService.generate(req.params.id);
-      sendSuccess(res, {
-        fileName: result.fileName,
-        invoice: result.invoice,
-      }, 'Invoice document generated successfully');
+      const id = parseInt(req.params.id);
+      const companyId = parseInt(req.params.companyId);
+      const userId = parseInt(req.user!.id);
+
+      const result = await invoiceService.generate(id, companyId, userId);
+      sendSuccessWithDates(
+        res,
+        {
+          fileName: result.fileName,
+          invoice: result.invoice,
+        },
+        'Invoice document generated successfully'
+      );
     } catch (error) {
       next(error);
     }
   },
 
+  /**
+   * Download invoice PDF
+   * GET /invoices/company/:companyId/:id/download
+   */
   async download(req: Request, res: Response, next: NextFunction) {
     try {
-      const filePath = await invoiceService.getFilePath(req.params.id);
+      const id = parseInt(req.params.id);
+      const companyId = parseInt(req.params.companyId);
+      const userId = parseInt(req.user!.id);
+
+      const filePath = await invoiceService.getFilePath(id, companyId, userId);
 
       // Check if file exists
       if (!fs.existsSync(filePath)) {
@@ -91,6 +171,24 @@ export const invoiceController = {
       // Stream the file
       const fileStream = fs.createReadStream(filePath);
       fileStream.pipe(res);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Update invoice status
+   * PATCH /invoices/company/:companyId/:id/status
+   */
+  async updateStatus(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id);
+      const companyId = parseInt(req.params.companyId);
+      const userId = parseInt(req.user!.id);
+      const { status } = req.body;
+
+      const invoice = await invoiceService.updateStatus(id, companyId, userId, status);
+      sendSuccessWithDates(res, invoice, 'Invoice status updated');
     } catch (error) {
       next(error);
     }

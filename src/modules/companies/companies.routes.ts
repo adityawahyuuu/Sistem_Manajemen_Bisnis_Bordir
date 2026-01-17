@@ -206,12 +206,7 @@ router.post('/', validate(createCompanySchema), companyController.createCompany)
  *       404:
  *         description: Company not found
  */
-router.put(
-  '/:id',
-  validate(companyIdSchema, 'params'),
-  validate(updateCompanySchema),
-  companyController.updateCompany
-);
+router.put('/:id', validate(companyIdSchema, 'params'), validate(updateCompanySchema), companyController.updateCompany);
 
 /**
  * @swagger
@@ -306,11 +301,7 @@ router.get('/:companyId/settings', companySettingsController.getSettings);
  *       200:
  *         description: Settings updated successfully
  */
-router.put(
-  '/:companyId/settings',
-  validate(updateSettingsSchema),
-  companySettingsController.updateSettings
-);
+router.put('/:companyId/settings', validate(updateSettingsSchema), companySettingsController.updateSettings);
 
 // Cash Accounts Routes
 /**
@@ -399,11 +390,7 @@ router.get('/:companyId/cash-accounts/:accountId', cashAccountController.getAcco
  *       201:
  *         description: Cash account created successfully
  */
-router.post(
-  '/:companyId/cash-accounts',
-  validate(createCashAccountSchema),
-  cashAccountController.createAccount
-);
+router.post('/:companyId/cash-accounts', validate(createCashAccountSchema), cashAccountController.createAccount);
 
 /**
  * @swagger
@@ -438,11 +425,7 @@ router.post(
  *       200:
  *         description: Cash account updated successfully
  */
-router.put(
-  '/:companyId/cash-accounts/:accountId',
-  validate(updateCashAccountSchema),
-  cashAccountController.updateAccount
-);
+router.put('/:companyId/cash-accounts/:accountId', validate(updateCashAccountSchema), cashAccountController.updateAccount);
 
 /**
  * @swagger

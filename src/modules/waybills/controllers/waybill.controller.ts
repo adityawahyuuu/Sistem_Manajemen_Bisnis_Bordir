@@ -2,18 +2,31 @@ import { Request, Response, NextFunction } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
 import { waybillService } from '../services/waybill.service';
-import { sendSuccess, sendCreated, sendFail } from '../../../shared/utils/response.util';
+import {
+  sendSuccess,
+  sendFail,
+  sendSuccessWithDates,
+  sendCreatedWithDates,
+} from '../../../shared/utils/response.util';
+import { waybills_status } from '../../../../prisma/generated/prisma';
 
 export const waybillController = {
-  async findAll(req: Request, res: Response, next: NextFunction) {
+  async findAllByCompany(req: Request, res: Response, next: NextFunction) {
     try {
+      const companyId = parseInt(req.params.companyId);
+      const userId = parseInt(req.user!.id);
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
-      const status = req.query.status as string;
-      const customerId = req.query.customer_id as string;
+      const customerId = req.query.customer_id ? parseInt(req.query.customer_id as string) : undefined;
+      const invoiceId = req.query.invoice_id ? parseInt(req.query.invoice_id as string) : undefined;
+      const status = req.query.status as waybills_status | undefined;
+      const search = req.query.search as string | undefined;
 
-      const { data, total } = await waybillService.findAll(page, limit, status, customerId);
-      sendSuccess(res, data, 'Waybills retrieved', 200, {
+      const { data, total } = await waybillService.findAllByCompany(
+        companyId, userId, page, limit, customerId, invoiceId, status, search
+      );
+
+      sendSuccessWithDates(res, data, 'Waybills retrieved', 200, {
         page, limit, total, totalPages: Math.ceil(total / limit),
       });
     } catch (error) {
@@ -23,8 +36,12 @@ export const waybillController = {
 
   async findById(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await waybillService.findById(req.params.id);
-      sendSuccess(res, result);
+      const id = parseInt(req.params.id);
+      const companyId = parseInt(req.params.companyId);
+      const userId = parseInt(req.user!.id);
+
+      const waybill = await waybillService.findById(id, companyId, userId);
+      sendSuccessWithDates(res, waybill, 'Waybill retrieved');
     } catch (error) {
       next(error);
     }
@@ -32,8 +49,15 @@ export const waybillController = {
 
   async create(req: Request, res: Response, next: NextFunction) {
     try {
-      const waybill = await waybillService.create(req.body, req.user?.id);
-      sendCreated(res, waybill, 'Waybill created');
+      const companyId = parseInt(req.params.companyId);
+      const userId = parseInt(req.user!.id);
+
+      const waybill = await waybillService.create(companyId, userId, {
+        ...req.body,
+        company_id: companyId,
+      });
+
+      sendCreatedWithDates(res, waybill, 'Waybill created');
     } catch (error) {
       next(error);
     }
@@ -41,8 +65,12 @@ export const waybillController = {
 
   async update(req: Request, res: Response, next: NextFunction) {
     try {
-      const waybill = await waybillService.update(req.params.id, req.body);
-      sendSuccess(res, waybill, 'Waybill updated');
+      const id = parseInt(req.params.id);
+      const companyId = parseInt(req.params.companyId);
+      const userId = parseInt(req.user!.id);
+
+      const waybill = await waybillService.update(id, companyId, userId, req.body);
+      sendSuccessWithDates(res, waybill, 'Waybill updated');
     } catch (error) {
       next(error);
     }
@@ -50,7 +78,11 @@ export const waybillController = {
 
   async delete(req: Request, res: Response, next: NextFunction) {
     try {
-      await waybillService.delete(req.params.id);
+      const id = parseInt(req.params.id);
+      const companyId = parseInt(req.params.companyId);
+      const userId = parseInt(req.user!.id);
+
+      await waybillService.delete(id, companyId, userId);
       sendSuccess(res, null, 'Waybill deleted');
     } catch (error) {
       next(error);
@@ -59,8 +91,12 @@ export const waybillController = {
 
   async generate(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await waybillService.generate(req.params.id);
-      sendSuccess(res, {
+      const id = parseInt(req.params.id);
+      const companyId = parseInt(req.params.companyId);
+      const userId = parseInt(req.user!.id);
+
+      const result = await waybillService.generate(id, companyId, userId);
+      sendSuccessWithDates(res, {
         fileName: result.fileName,
         waybill: result.waybill,
       }, 'Waybill document generated successfully');
@@ -71,23 +107,37 @@ export const waybillController = {
 
   async download(req: Request, res: Response, next: NextFunction) {
     try {
-      const filePath = await waybillService.getFilePath(req.params.id);
+      const id = parseInt(req.params.id);
+      const companyId = parseInt(req.params.companyId);
+      const userId = parseInt(req.user!.id);
 
-      // Check if file exists
+      const filePath = await waybillService.getFilePath(id, companyId, userId);
+
       if (!fs.existsSync(filePath)) {
         return sendFail(res, 'File not found', 404);
       }
 
       const fileName = path.basename(filePath);
-
-      // Set headers for file download
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
       res.setHeader('Content-Length', fs.statSync(filePath).size);
 
-      // Stream the file
       const fileStream = fs.createReadStream(filePath);
       fileStream.pipe(res);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async updateStatus(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id);
+      const companyId = parseInt(req.params.companyId);
+      const userId = parseInt(req.user!.id);
+      const { status } = req.body;
+
+      const waybill = await waybillService.updateStatus(id, companyId, userId, status);
+      sendSuccessWithDates(res, waybill, 'Waybill status updated');
     } catch (error) {
       next(error);
     }

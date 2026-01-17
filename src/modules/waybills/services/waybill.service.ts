@@ -1,140 +1,291 @@
+import { prisma } from '../../../database/prisma.client';
 import { CreateWaybillDto, UpdateWaybillDto } from '../interfaces/waybill.interface';
 import { AppError } from '../../../middleware';
 import { documentGenerator } from '../../../shared/utils/document.generator';
+import { waybills_status } from '../../../../prisma/generated/prisma';
 
 export const waybillService = {
-  // async findAll(page = 1, limit = 10, status?: string, customerId?: string) {
-  //   return waybillRepository.findAll(page, limit, status, customerId);
-  // },
+  async findAllByCompany(
+    companyId: number,
+    userId: number,
+    page = 1,
+    limit = 10,
+    customerId?: number,
+    invoiceId?: number,
+    status?: waybills_status,
+    search?: string
+  ) {
+    const company = await prisma.companies.findFirst({
+      where: { id: companyId, user_id: userId, deleted_at: null },
+    });
 
-  // async findById(id: string) {
-  //   const result = await waybillRepository.findByIdWithItems(id);
-  //   if (!result) throw new AppError('Waybill not found', 404);
-  //   return result;
-  // },
+    if (!company) {
+      throw new AppError('Company not found or access denied', 404);
+    }
 
-  // async create(data: CreateWaybillDto, userId?: string) {
-  //   // Get invoice with items
-  //   const invoiceResult = await invoiceRepository.findByIdWithItems(data.invoice_id);
-  //   if (!invoiceResult) {
-  //     throw new AppError('Invoice not found', 404);
-  //   }
+    const where: Record<string, unknown> = {
+      company_id: companyId,
+      ...(customerId && { customer_id: customerId }),
+      ...(invoiceId && { invoice_id: invoiceId }),
+      ...(status && { status }),
+      ...(search && {
+        OR: [
+          { waybill_number: { contains: search } },
+          { customers: { name: { contains: search } } },
+        ],
+      }),
+    };
 
-  //   const { invoice, items: invoiceItems } = invoiceResult;
+    const [waybills, total] = await Promise.all([
+      prisma.waybills.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { created_at: 'desc' },
+        include: {
+          customers: { select: { id: true, name: true, company_name: true } },
+          invoices: { select: { id: true, invoice_number: true } },
+          _count: { select: { waybill_items: true } },
+        },
+      }),
+      prisma.waybills.count({ where }),
+    ]);
 
-  //   if (!invoiceItems || invoiceItems.length === 0) {
-  //     throw new AppError('Invoice has no items', 400);
-  //   }
+    return { data: waybills, total };
+  },
 
-  //   // Get customer from invoice
-  //   // TODO: Migrate to Prisma customerService
-  //   // const customer = await customerRepository.findById(invoice.customer_id);
-  //   // if (!customer) {
-  //   //   throw new AppError('Customer not found', 404);
-  //   // }
-  //   const customer: any = { name: 'Customer', address: '', city: '', province: '' }; // Temporary placeholder
+  async findById(id: number, companyId: number, userId: number) {
+    const company = await prisma.companies.findFirst({
+      where: { id: companyId, user_id: userId, deleted_at: null },
+    });
 
-  //   // Map invoice items to waybill items
-  //   const waybillItems = invoiceItems.map(item => ({
-  //     name: item.item_name,
-  //     quantity: item.quantity,
-  //     unit: item.unit || 'pcs',
-  //     notes: '',
-  //   }));
+    if (!company) {
+      throw new AppError('Company not found or access denied', 404);
+    }
 
-  //   // Create waybill with invoice data
-  //   const waybillData = {
-  //     ...data,
-  //     customer_id: invoice.customer_id,
-  //     items: waybillItems,
-  //   };
+    const waybill = await prisma.waybills.findFirst({
+      where: { id, company_id: companyId },
+      include: {
+        waybill_items: true,
+        customers: true,
+        invoices: true,
+        companies: { include: { company_settings: true } },
+      },
+    });
 
-  //   return waybillRepository.create(waybillData, userId);
-  // },
+    if (!waybill) {
+      throw new AppError('Waybill not found', 404);
+    }
 
-  // async update(id: string, data: UpdateWaybillDto) {
-  //   const waybill = await waybillRepository.update(id, data);
-  //   if (!waybill) throw new AppError('Waybill not found', 404);
-  //   return waybill;
-  // },
+    return waybill;
+  },
 
-  // async delete(id: string) {
-  //   const deleted = await waybillRepository.delete(id);
-  //   if (!deleted) throw new AppError('Waybill not found', 404);
-  //   return true;
-  // },
+  async create(companyId: number, userId: number, data: CreateWaybillDto) {
+    const company = await prisma.companies.findFirst({
+      where: { id: companyId, user_id: userId, deleted_at: null },
+    });
 
-  // async generate(id: string) {
-  //   const result = await waybillRepository.findByIdWithItems(id);
-  //   if (!result) {
-  //     throw new AppError('Waybill not found', 404);
-  //   }
+    if (!company) {
+      throw new AppError('Company not found or access denied', 404);
+    }
 
-  //   const { waybill, items } = result;
+    const customer = await prisma.customers.findFirst({
+      where: { id: data.customer_id, company_id: companyId },
+    });
 
-  //   // Get customer data
-  //   // TODO: Migrate to Prisma customerService
-  //   // const customer = await customerRepository.findById(waybill.customer_id);
-  //   // if (!customer) {
-  //   //   throw new AppError('Customer not found', 404);
-  //   // }
-  //   const customer: any = { name: 'Customer', address: '', city: '', province: '' }; // Temporary placeholder
+    if (!customer) {
+      throw new AppError('Customer not found', 404);
+    }
 
-  //   // Get invoice number if linked
-  //   let invoiceNumber = null;
-  //   if (waybill.invoice_id) {
-  //     const invoice = await invoiceRepository.findById(waybill.invoice_id);
-  //     if (invoice) {
-  //       invoiceNumber = invoice.invoice_number;
-  //     }
-  //   }
+    let items = data.items || [];
 
-  //   // Prepare document data
-  //   const documentData = {
-  //     waybill_number: waybill.waybill_number,
-  //     date: waybill.waybill_date instanceof Date
-  //       ? waybill.waybill_date.toLocaleDateString('id-ID')
-  //       : new Date(waybill.waybill_date).toLocaleDateString('id-ID'),
-  //     customer_name: customer.name,
-  //     delivery_address: waybill.destination_address || customer.address,
-  //     delivery_city: waybill.destination_city || customer.city,
-  //     delivery_province: waybill.destination_province || customer.province,
-  //     invoice_number: invoiceNumber,
-  //     vehicle_type: 'Kendaraan',
-  //     vehicle_number: waybill.vehicle_number,
-  //     driver_name: waybill.driver_name,
-  //     driver_phone: '',
-  //     items: items.map(item => ({
-  //       description: item.item_name,
-  //       quantity: item.quantity,
-  //       unit: item.unit || 'pcs',
-  //     })),
-  //     notes: waybill.notes,
-  //   };
+    // If invoice_id provided, get items from invoice
+    if (data.invoice_id) {
+      const invoice = await prisma.invoices.findFirst({
+        where: { id: data.invoice_id, company_id: companyId },
+        include: { invoice_items: true },
+      });
 
-  //   // Generate PDF
-  //   const htmlContent = documentGenerator.generateWaybillHtml(documentData);
-  //   const fileName = `waybill-${waybill.waybill_number}.pdf`;
-  //   const filePath = await documentGenerator.generatePdf(htmlContent, fileName);
+      if (!invoice) {
+        throw new AppError('Invoice not found', 404);
+      }
 
-  //   // Update waybill with file path
-  //   await waybillRepository.updateFilePath(id, fileName);
+      if (!data.items || data.items.length === 0) {
+        items = invoice.invoice_items.map((item) => ({
+          name: item.item_name,
+          quantity: Number(item.quantity),
+          unit: 'pcs',
+          notes: item.description || '',
+        }));
+      }
+    }
 
-  //   return {
-  //     filePath,
-  //     fileName,
-  //     waybill: { ...waybill, generated_file_path: fileName, status: 'generated' },
-  //   };
-  // },
+    const waybillNumber = await this.generateWaybillNumber(companyId);
 
-  // async getFilePath(id: string) {
-  //   const waybill = await waybillRepository.findById(id);
-  //   if (!waybill) {
-  //     throw new AppError('Waybill not found', 404);
-  //   }
-  //   if (!waybill.generated_file_path) {
-  //     throw new AppError('Waybill document not generated yet', 400);
-  //   }
-  //   return documentGenerator.getFilePath(waybill.generated_file_path);
-  // },
+    const waybill = await prisma.waybills.create({
+      data: {
+        company_id: companyId,
+        customer_id: data.customer_id,
+        invoice_id: data.invoice_id || null,
+        waybill_number: waybillNumber,
+        waybill_date: data.waybill_date ? new Date(data.waybill_date) : new Date(),
+        destination_address: data.destination_address || customer.address || '',
+        destination_city: data.destination_city || customer.city || 'Tasikmalaya',
+        destination_province: data.destination_province || customer.province || 'Jawa Barat',
+        vehicle_number: data.vehicle_number || null,
+        driver_name: data.driver_name || null,
+        notes: data.notes || null,
+        status: 'pending',
+        created_by: userId,
+        waybill_items: {
+          create: items.map((item) => ({
+            item_name: item.name,
+            quantity: item.quantity,
+            unit: item.unit || 'pcs',
+            notes: item.notes || null,
+          })),
+        },
+      },
+      include: { waybill_items: true, customers: true, invoices: true },
+    });
+
+    return waybill;
+  },
+
+  async update(id: number, companyId: number, userId: number, data: UpdateWaybillDto) {
+    const company = await prisma.companies.findFirst({
+      where: { id: companyId, user_id: userId, deleted_at: null },
+    });
+
+    if (!company) {
+      throw new AppError('Company not found or access denied', 404);
+    }
+
+    const existingWaybill = await prisma.waybills.findFirst({
+      where: { id, company_id: companyId },
+    });
+
+    if (!existingWaybill) {
+      throw new AppError('Waybill not found', 404);
+    }
+
+    if (existingWaybill.status === 'delivered') {
+      throw new AppError('Cannot update delivered waybill', 400);
+    }
+
+    const waybill = await prisma.waybills.update({
+      where: { id },
+      data: {
+        destination_address: data.destination_address,
+        destination_city: data.destination_city,
+        destination_province: data.destination_province,
+        vehicle_number: data.vehicle_number,
+        driver_name: data.driver_name,
+        notes: data.notes,
+        status: data.status as waybills_status,
+        updated_at: new Date(),
+      },
+      include: { waybill_items: true, customers: true, invoices: true },
+    });
+
+    return waybill;
+  },
+
+  async delete(id: number, companyId: number, userId: number) {
+    const company = await prisma.companies.findFirst({
+      where: { id: companyId, user_id: userId, deleted_at: null },
+    });
+
+    if (!company) {
+      throw new AppError('Company not found or access denied', 404);
+    }
+
+    const existingWaybill = await prisma.waybills.findFirst({
+      where: { id, company_id: companyId },
+    });
+
+    if (!existingWaybill) {
+      throw new AppError('Waybill not found', 404);
+    }
+
+    if (existingWaybill.generated_file_path) {
+      documentGenerator.deleteFile(existingWaybill.generated_file_path);
+    }
+
+    await prisma.waybills.delete({ where: { id } });
+
+    return true;
+  },
+
+  async generate(id: number, companyId: number, userId: number) {
+    const waybill = await this.findById(id, companyId, userId);
+
+    const documentData = {
+      company_name: waybill.companies?.name || '',
+      company_address: [waybill.companies?.address, waybill.companies?.city, waybill.companies?.province].filter(Boolean).join(', '),
+      company_phone: waybill.companies?.phone || '',
+      waybill_number: waybill.waybill_number,
+      date: waybill.waybill_date instanceof Date
+        ? waybill.waybill_date.toLocaleDateString('id-ID')
+        : new Date(waybill.waybill_date).toLocaleDateString('id-ID'),
+      customer_name: waybill.customers?.name || '',
+      delivery_address: waybill.destination_address || '',
+      delivery_city: waybill.destination_city || '',
+      delivery_province: waybill.destination_province || '',
+      invoice_number: waybill.invoices?.invoice_number || null,
+      vehicle_number: waybill.vehicle_number || '',
+      driver_name: waybill.driver_name || '',
+      items: waybill.waybill_items.map((item) => ({
+        description: item.item_name,
+        quantity: Number(item.quantity),
+        unit: item.unit || 'pcs',
+      })),
+      notes: waybill.notes || '',
+      primary_color: waybill.companies?.company_settings?.primary_color || '#333333',
+    };
+
+    const htmlContent = documentGenerator.generateWaybillHtml(documentData);
+    const fileName = `waybill-${waybill.waybill_number.replace(/[/\\]/g, '-')}.pdf`;
+    await documentGenerator.generatePdf(htmlContent, fileName);
+
+    await prisma.waybills.update({
+      where: { id },
+      data: { generated_file_path: fileName, updated_at: new Date() },
+    });
+
+    return { fileName, waybill: { ...waybill, generated_file_path: fileName } };
+  },
+
+  async getFilePath(id: number, companyId: number, userId: number) {
+    const waybill = await this.findById(id, companyId, userId);
+
+    if (!waybill.generated_file_path) {
+      throw new AppError('Waybill document not generated yet', 400);
+    }
+
+    return documentGenerator.getFilePath(waybill.generated_file_path);
+  },
+
+  async generateWaybillNumber(companyId: number) {
+    const now = new Date();
+    const year = now.getFullYear().toString();
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+    const count = await prisma.waybills.count({
+      where: {
+        company_id: companyId,
+        created_at: { gte: startOfMonth, lte: endOfMonth },
+      },
+    });
+
+    const number = (count + 1).toString().padStart(4, '0');
+    return `SJ-${year}${month}-${number}`;
+  },
+
+  async updateStatus(id: number, companyId: number, userId: number, status: waybills_status) {
+    return this.update(id, companyId, userId, { status });
+  },
 };

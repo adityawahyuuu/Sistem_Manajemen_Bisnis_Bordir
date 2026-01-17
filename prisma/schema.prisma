@@ -194,7 +194,7 @@ model receipts {
   id                  Int                     @id @default(autoincrement())
   company_id          Int
   invoice_id          Int?
-  customer_id         Int
+   customer_id         Int
   receipt_number      String                  @db.VarChar(100)
   receipt_date        DateTime                @db.Date
   amount              Decimal                 @default(0.00) @db.Decimal(15, 2)

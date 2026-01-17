@@ -109,16 +109,24 @@ class DocumentGenerator {
       total: number;
     }>;
 
+    const primaryColor = (data.primary_color as string) || '#333333';
+    const showTax = data.show_tax_column !== false;
+    const showDiscount = data.show_discount_column !== false;
+
     const itemsHtml = items?.map((item, index) => `
       <tr>
-        <td>${index + 1}</td>
+        <td style="text-align: center;">${index + 1}</td>
         <td>${item.description}</td>
-        <td>${item.quantity}</td>
-        <td>${item.unit}</td>
-        <td>Rp ${Number(item.unit_price).toLocaleString('id-ID')}</td>
-        <td>Rp ${Number(item.total).toLocaleString('id-ID')}</td>
+        <td style="text-align: center;">${item.quantity}</td>
+        <td style="text-align: center;">${item.unit}</td>
+        <td style="text-align: right;">Rp ${Number(item.unit_price).toLocaleString('id-ID')}</td>
+        <td style="text-align: right;">Rp ${Number(item.total).toLocaleString('id-ID')}</td>
       </tr>
     `).join('') || '';
+
+    const logoHtml = data.company_logo
+      ? `<img src="${data.company_logo}" alt="Logo" style="max-height: 60px; max-width: 200px; margin-bottom: 10px;" />`
+      : '';
 
     return `
     <!DOCTYPE html>
@@ -126,52 +134,80 @@ class DocumentGenerator {
     <head>
       <meta charset="UTF-8">
       <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
-        .header { text-align: center; margin-bottom: 30px; }
-        .header h1 { margin: 0; color: #333; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; font-size: 12px; color: #333; }
+        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; border-bottom: 2px solid ${primaryColor}; padding-bottom: 20px; }
+        .company-info { text-align: left; }
+        .company-info h2 { margin: 0 0 5px 0; color: ${primaryColor}; }
+        .company-info p { margin: 2px 0; color: #666; font-size: 11px; }
+        .invoice-title { text-align: right; }
+        .invoice-title h1 { margin: 0; color: ${primaryColor}; font-size: 28px; }
+        .invoice-title p { margin: 5px 0; }
         .info { display: flex; justify-content: space-between; margin-bottom: 20px; }
         .info-left, .info-right { width: 48%; }
-        .info p { margin: 5px 0; }
+        .info-left { background: #f9f9f9; padding: 15px; border-radius: 5px; }
+        .info p { margin: 4px 0; }
         .info strong { color: #555; }
+        .label { color: #888; font-size: 10px; text-transform: uppercase; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        th { background-color: #f5f5f5; }
-        .totals { text-align: right; }
-        .totals p { margin: 5px 0; }
-        .totals .grand-total { font-size: 18px; font-weight: bold; color: #333; }
-        .footer { margin-top: 50px; text-align: center; color: #777; }
+        th { background-color: ${primaryColor}; color: white; padding: 10px; text-align: left; font-size: 11px; }
+        td { border-bottom: 1px solid #eee; padding: 10px; }
+        tr:hover { background-color: #fafafa; }
+        .totals { text-align: right; margin-top: 20px; }
+        .totals table { width: 300px; margin-left: auto; }
+        .totals td { border: none; padding: 5px 10px; }
+        .totals .label-col { text-align: right; color: #666; }
+        .totals .value-col { text-align: right; font-weight: 500; }
+        .totals .grand-total td { font-size: 16px; font-weight: bold; color: ${primaryColor}; border-top: 2px solid ${primaryColor}; padding-top: 10px; }
+        .notes { margin-top: 30px; padding: 15px; background: #f9f9f9; border-radius: 5px; }
+        .notes h4 { margin: 0 0 10px 0; color: #555; }
+        .terms { margin-top: 20px; font-size: 10px; color: #888; }
+        .footer { margin-top: 40px; text-align: center; color: #888; font-size: 11px; border-top: 1px solid #eee; padding-top: 20px; }
+        .signature { margin-top: 50px; display: flex; justify-content: flex-end; }
+        .signature-box { width: 200px; text-align: center; }
+        .signature-line { border-top: 1px solid #333; margin-top: 60px; padding-top: 5px; }
       </style>
     </head>
     <body>
       <div class="header">
-        <h1>INVOICE</h1>
-        <p><strong>${data.invoice_number}</strong></p>
+        <div class="company-info">
+          ${logoHtml}
+          <h2>${data.company_name || ''}</h2>
+          <p>${data.company_address || ''}</p>
+          <p>${data.company_phone ? `Tel: ${data.company_phone}` : ''} ${data.company_email ? `| ${data.company_email}` : ''}</p>
+        </div>
+        <div class="invoice-title">
+          <h1>INVOICE</h1>
+          <p><strong>${data.invoice_number}</strong></p>
+          <p class="label">Tanggal</p>
+          <p>${data.date}</p>
+          <p class="label">Jatuh Tempo</p>
+          <p>${data.due_date || '-'}</p>
+        </div>
       </div>
 
       <div class="info">
         <div class="info-left">
-          <p><strong>Kepada:</strong></p>
-          <p>${data.customer_name}</p>
-          <p>${data.customer_company || ''}</p>
-          <p>${data.customer_address || ''}</p>
-          <p>${data.customer_phone || ''}</p>
+          <p class="label">Ditagihkan Kepada:</p>
+          <p><strong>${data.customer_name}</strong></p>
+          ${data.customer_company ? `<p>${data.customer_company}</p>` : ''}
+          ${data.customer_address ? `<p>${data.customer_address}</p>` : ''}
+          ${data.customer_phone ? `<p>Tel: ${data.customer_phone}</p>` : ''}
         </div>
-        <div class="info-right">
-          <p><strong>Tanggal:</strong> ${data.date}</p>
-          <p><strong>Jatuh Tempo:</strong> ${data.due_date}</p>
-          <p><strong>Status:</strong> ${data.status}</p>
+        <div class="info-right" style="text-align: right;">
+          <p class="label">Status</p>
+          <p style="display: inline-block; padding: 5px 15px; background: ${data.status === 'paid' ? '#4caf50' : data.status === 'cancelled' ? '#f44336' : '#ff9800'}; color: white; border-radius: 20px; font-size: 11px; text-transform: uppercase;">${data.status}</p>
         </div>
       </div>
 
       <table>
         <thead>
           <tr>
-            <th>No</th>
+            <th style="width: 40px; text-align: center;">No</th>
             <th>Deskripsi</th>
-            <th>Qty</th>
-            <th>Satuan</th>
-            <th>Harga</th>
-            <th>Total</th>
+            <th style="width: 60px; text-align: center;">Qty</th>
+            <th style="width: 60px; text-align: center;">Satuan</th>
+            <th style="width: 100px; text-align: right;">Harga Satuan</th>
+            <th style="width: 100px; text-align: right;">Total</th>
           </tr>
         </thead>
         <tbody>
@@ -180,16 +216,52 @@ class DocumentGenerator {
       </table>
 
       <div class="totals">
-        <p>Subtotal: Rp ${Number(data.subtotal).toLocaleString('id-ID')}</p>
-        ${data.discount ? `<p>Diskon: Rp ${Number(data.discount).toLocaleString('id-ID')}</p>` : ''}
-        ${data.tax ? `<p>Pajak: Rp ${Number(data.tax).toLocaleString('id-ID')}</p>` : ''}
-        <p class="grand-total">Total: Rp ${Number(data.total).toLocaleString('id-ID')}</p>
+        <table>
+          <tr>
+            <td class="label-col">Subtotal</td>
+            <td class="value-col">Rp ${Number(data.subtotal).toLocaleString('id-ID')}</td>
+          </tr>
+          ${showDiscount && data.discount ? `
+          <tr>
+            <td class="label-col">Diskon</td>
+            <td class="value-col">- Rp ${Number(data.discount).toLocaleString('id-ID')}</td>
+          </tr>
+          ` : ''}
+          ${showTax && data.tax ? `
+          <tr>
+            <td class="label-col">Pajak</td>
+            <td class="value-col">Rp ${Number(data.tax).toLocaleString('id-ID')}</td>
+          </tr>
+          ` : ''}
+          <tr class="grand-total">
+            <td class="label-col">Total</td>
+            <td class="value-col">Rp ${Number(data.total).toLocaleString('id-ID')}</td>
+          </tr>
+        </table>
       </div>
 
-      ${data.notes ? `<p><strong>Catatan:</strong> ${data.notes}</p>` : ''}
+      ${data.notes ? `
+      <div class="notes">
+        <h4>Catatan:</h4>
+        <p>${data.notes}</p>
+      </div>
+      ` : ''}
+
+      ${data.terms_conditions ? `
+      <div class="terms">
+        <strong>Syarat & Ketentuan:</strong>
+        <p>${data.terms_conditions}</p>
+      </div>
+      ` : ''}
+
+      <div class="signature">
+        <div class="signature-box">
+          <div class="signature-line">Hormat Kami</div>
+        </div>
+      </div>
 
       <div class="footer">
-        <p>Terima kasih atas kepercayaan Anda</p>
+        ${data.footer_text || 'Terima kasih atas kepercayaan Anda'}
       </div>
     </body>
     </html>
