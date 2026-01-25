@@ -8,53 +8,54 @@ datasource db {
 }
 
 model companies {
-  id                Int                   @id @default(autoincrement())
-  user_id           Int
-  name              String                @db.VarChar(255)
-  domain            String?               @db.VarChar(255)
-  address           String?               @db.Text
-  city              String?               @db.VarChar(100)
-  province          String?               @db.VarChar(100)
-  postal_code       String?               @db.VarChar(20)
-  phone             String?               @db.VarChar(50)
-  email             String?               @db.VarChar(255)
-  is_active         Boolean               @default(true)
-  created_at        DateTime?             @default(now()) @db.Timestamp(0)
-  updated_at        DateTime?             @default(now()) @db.Timestamp(0)
-  deleted_at        DateTime?             @db.Timestamp(0)
-  users             users                 @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "fk_companies_user_id")
-  customers         customers[]
-  invoices          invoices[]
-  receipts          receipts[]
-  waybills          waybills[]
-  company_settings  company_settings?
-  cash_accounts     company_cash_accounts[]
-  company_modules   company_modules[]
-  items             items[]
+  id                 Int                     @id @default(autoincrement())
+  user_id            Int
+  domain             String?                 @db.VarChar(255)
+  is_active          Boolean                 @default(true)
+  created_at         DateTime?               @default(now()) @db.Timestamp(0)
+  updated_at         DateTime?               @default(now()) @db.Timestamp(0)
+  deleted_at         DateTime?               @db.Timestamp(0)
+  address            String?                 @db.Text
+  city               String?                 @db.VarChar(100)
+  email              String?                 @db.VarChar(255)
+  name               String                  @db.VarChar(255)
+  phone              String?                 @db.VarChar(50)
+  postal_code        String?                 @db.VarChar(20)
+  province           String?                 @db.VarChar(100)
+  users              users                   @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "fk_companies_user_id")
+  cash_accounts      company_cash_accounts[]
+  company_modules    company_modules[]
+  company_settings   company_settings?
+  customers          customers[]
+  document_templates document_templates[]
+  invoices           invoices[]
+  items              items[]
+  receipts           receipts[]
+  waybills           waybills[]
 
   @@index([user_id], map: "fk_companies_user_id")
 }
 
 model company_settings {
-  id                  Int       @id @default(autoincrement())
-  company_id          Int       @unique
-  logo_url            String?   @db.VarChar(500)
-  primary_color       String?   @default("#000000") @db.VarChar(7)
-  secondary_color     String?   @default("#666666") @db.VarChar(7)
-  font_family         String?   @default("Arial") @db.VarChar(100)
-  font_size           Int?      @default(12)
-  header_text         String?   @db.Text
-  footer_text         String?   @db.Text
-  terms_conditions    String?   @db.Text
-  invoice_prefix      String?   @default("INV") @db.VarChar(10)
-  invoice_number_format String? @default("{PREFIX}-{YEAR}{MONTH}-{NUMBER}") @db.VarChar(100)
-  show_company_logo   Boolean   @default(true)
-  show_company_address Boolean  @default(true)
-  show_tax_column     Boolean   @default(true)
-  show_discount_column Boolean  @default(true)
-  created_at          DateTime? @default(now()) @db.Timestamp(0)
-  updated_at          DateTime? @default(now()) @db.Timestamp(0)
-  companies           companies @relation(fields: [company_id], references: [id], onDelete: Cascade, map: "fk_settings_company")
+  id                    Int       @id @default(autoincrement())
+  company_id            Int       @unique
+  logo_url              String?   @db.VarChar(500)
+  primary_color         String?   @default("#000000") @db.VarChar(7)
+  secondary_color       String?   @default("#666666") @db.VarChar(7)
+  font_family           String?   @default("Arial") @db.VarChar(100)
+  font_size             Int?      @default(12)
+  header_text           String?   @db.Text
+  footer_text           String?   @db.Text
+  terms_conditions      String?   @db.Text
+  invoice_prefix        String?   @default("INV") @db.VarChar(10)
+  invoice_number_format String?   @default("{PREFIX}-{YEAR}{MONTH}-{NUMBER}") @db.VarChar(100)
+  show_company_logo     Boolean   @default(true)
+  show_company_address  Boolean   @default(true)
+  show_tax_column       Boolean   @default(true)
+  show_discount_column  Boolean   @default(true)
+  created_at            DateTime? @default(now()) @db.Timestamp(0)
+  updated_at            DateTime? @default(now()) @db.Timestamp(0)
+  companies             companies @relation(fields: [company_id], references: [id], onDelete: Cascade, map: "fk_settings_company")
 
   @@index([company_id], map: "idx_settings_company")
 }
@@ -104,11 +105,11 @@ model customers {
   postal_code      String?          @db.VarChar(20)
   created_at       DateTime?        @default(now()) @db.Timestamp(0)
   updated_at       DateTime?        @default(now()) @db.Timestamp(0)
+  customer_items   customer_items[]
   companies        companies        @relation(fields: [company_id], references: [id], onDelete: Cascade, map: "fk_customers_company_id")
   invoices         invoices[]
   receipts         receipts[]
   waybills         waybills[]
-  customer_items   customer_items[]
 
   @@index([company_id], map: "fk_customers_company_id")
 }
@@ -124,23 +125,24 @@ model items {
   is_active      Boolean          @default(true)
   created_at     DateTime?        @default(now()) @db.Timestamp(0)
   updated_at     DateTime?        @default(now()) @db.Timestamp(0)
-  companies      companies        @relation(fields: [company_id], references: [id], onDelete: Cascade, map: "fk_items_company")
+  category       String?          @db.VarChar(100)
   customer_items customer_items[]
+  companies      companies        @relation(fields: [company_id], references: [id], onDelete: Cascade, map: "fk_items_company")
 
   @@unique([company_id, item_code], map: "unique_item_code_per_company")
   @@index([company_id], map: "idx_items_company")
 }
 
 model customer_items {
-  id            Int       @id @default(autoincrement())
-  customer_id   Int
-  item_id       Int
-  custom_price  Decimal?  @db.Decimal(15, 2)
-  notes         String?   @db.Text
-  created_at    DateTime? @default(now()) @db.Timestamp(0)
-  updated_at    DateTime? @default(now()) @db.Timestamp(0)
-  customers     customers @relation(fields: [customer_id], references: [id], onDelete: Cascade, map: "fk_customer_items_customer")
-  items         items     @relation(fields: [item_id], references: [id], onDelete: Cascade, map: "fk_customer_items_item")
+  id           Int       @id @default(autoincrement())
+  customer_id  Int
+  item_id      Int
+  custom_price Decimal?  @db.Decimal(15, 2)
+  notes        String?   @db.Text
+  created_at   DateTime? @default(now()) @db.Timestamp(0)
+  updated_at   DateTime? @default(now()) @db.Timestamp(0)
+  customers    customers @relation(fields: [customer_id], references: [id], onDelete: Cascade, map: "fk_customer_items_customer")
+  items        items     @relation(fields: [item_id], references: [id], onDelete: Cascade, map: "fk_customer_items_item")
 
   @@unique([customer_id, item_id], map: "unique_customer_item")
   @@index([customer_id], map: "idx_customer_items_customer")
@@ -156,9 +158,11 @@ model invoice_items {
   unit_price  Decimal   @default(0.00) @db.Decimal(15, 2)
   total_price Decimal   @default(0.00) @db.Decimal(15, 2)
   created_at  DateTime? @default(now()) @db.Timestamp(0)
+  item_id     Int
   invoices    invoices  @relation(fields: [invoice_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_invoice_items_invoice_id")
 
   @@index([invoice_id], map: "fk_invoice_items_invoice_id")
+  @@index([item_id], map: "fk_invoice_items_item")
 }
 
 model invoices {
@@ -181,7 +185,7 @@ model invoices {
   invoice_items       invoice_items[]
   companies           companies       @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_invoices_company_id")
   users               users           @relation(fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_invoices_created_by")
-  customers           customers       @relation(fields: [customer_id], references: [id], onUpdate: NoAction, map: "fk_invoices_customer_id")
+  customers           customers       @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_invoices_customer_id")
   receipts            receipts[]
   waybills            waybills[]
 
@@ -194,7 +198,7 @@ model receipts {
   id                  Int                     @id @default(autoincrement())
   company_id          Int
   invoice_id          Int?
-   customer_id         Int
+  customer_id         Int
   receipt_number      String                  @db.VarChar(100)
   receipt_date        DateTime                @db.Date
   amount              Decimal                 @default(0.00) @db.Decimal(15, 2)
@@ -208,7 +212,7 @@ model receipts {
   updated_at          DateTime?               @default(now()) @db.Timestamp(0)
   companies           companies               @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_receipts_company_id")
   users               users                   @relation(fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_receipts_created_by")
-  customers           customers               @relation(fields: [customer_id], references: [id], onUpdate: NoAction, map: "fk_receipts_customer_id")
+  customers           customers               @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_receipts_customer_id")
   invoices            invoices?               @relation(fields: [invoice_id], references: [id], onUpdate: NoAction, map: "fk_receipts_invoice_id")
 
   @@unique([company_id, receipt_number], map: "unique_receipt_number_per_company")
@@ -218,20 +222,22 @@ model receipts {
 }
 
 model users {
-  id                Int         @id @default(autoincrement())
-  name              String      @db.VarChar(255)
-  email             String      @unique @db.VarChar(255)
-  password          String      @db.VarChar(255)
-  role              String      @default("USER") @db.VarChar(50)
-  last_logged_in_at DateTime?   @db.Timestamp(0)
-  is_active         Boolean     @default(true)
-  created_at        DateTime?   @default(now()) @db.Timestamp(0)
-  updated_at        DateTime?   @default(now()) @db.Timestamp(0)
-  deleted_at        DateTime?   @db.Timestamp(0)
-  companies         companies[]
-  invoices          invoices[]
-  receipts          receipts[]
-  waybills          waybills[]
+  id                 Int                          @id @default(autoincrement())
+  name               String                       @db.VarChar(255)
+  email              String                       @unique @db.VarChar(255)
+  password           String                       @db.VarChar(255)
+  last_logged_in_at  DateTime?                    @db.Timestamp(0)
+  is_active          Boolean                      @default(true)
+  created_at         DateTime?                    @default(now()) @db.Timestamp(0)
+  updated_at         DateTime?                    @default(now()) @db.Timestamp(0)
+  deleted_at         DateTime?                    @db.Timestamp(0)
+  role               String                       @default("USER") @db.VarChar(50)
+  companies          companies[]
+  published_versions document_template_versions[] @relation("version_published_by")
+  created_templates  document_templates[]         @relation("template_created_by")
+  invoices           invoices[]
+  receipts           receipts[]
+  waybills           waybills[]
 }
 
 model waybill_items {
@@ -268,7 +274,7 @@ model waybills {
   waybill_items        waybill_items[]
   companies            companies       @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_waybills_company_id")
   users                users           @relation(fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_waybills_created_by")
-  customers            customers       @relation(fields: [customer_id], references: [id], onUpdate: NoAction, map: "fk_waybills_customer_id")
+  customers            customers       @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_waybills_customer_id")
   invoices             invoices?       @relation(fields: [invoice_id], references: [id], onUpdate: NoAction, map: "fk_waybills_invoice_id")
 
   @@unique([company_id, waybill_number], map: "unique_waybill_number_per_company")
@@ -303,13 +309,13 @@ model password_reset_tokens {
 }
 
 model login_attempts {
-  id           Int       @id @default(autoincrement())
-  email        String    @db.VarChar(255)
-  ip_address   String    @db.VarChar(45)
-  user_agent   String?   @db.Text
-  success      Boolean   @default(false)
-  failure_reason String? @db.VarChar(255)
-  attempted_at DateTime  @default(now()) @db.Timestamp(0)
+  id             Int      @id @default(autoincrement())
+  email          String   @db.VarChar(255)
+  ip_address     String   @db.VarChar(45)
+  user_agent     String?  @db.Text
+  success        Boolean  @default(false)
+  failure_reason String?  @db.VarChar(255)
+  attempted_at   DateTime @default(now()) @db.Timestamp(0)
 
   @@index([email], map: "idx_login_email")
   @@index([ip_address], map: "idx_login_ip")
@@ -317,15 +323,57 @@ model login_attempts {
 }
 
 model refresh_tokens {
-  id         Int       @id @default(autoincrement())
+  id         Int      @id @default(autoincrement())
   user_id    Int
-  token      String    @unique @db.VarChar(500)
-  expires_at DateTime  @db.Timestamp(0)
-  is_revoked Boolean   @default(false)
-  created_at DateTime  @default(now()) @db.Timestamp(0)
+  token      String   @unique @db.VarChar(500)
+  expires_at DateTime @db.Timestamp(0)
+  is_revoked Boolean  @default(false)
+  created_at DateTime @default(now()) @db.Timestamp(0)
 
   @@index([user_id], map: "idx_refresh_user")
   @@index([token], map: "idx_refresh_token")
+}
+
+model document_templates {
+  id              Int                          @id @default(autoincrement())
+  company_id      Int?
+  name            String                       @db.VarChar(255)
+  description     String?                      @db.Text
+  document_type   document_template_type
+  template_schema Json
+  version         Int                          @default(1)
+  status          document_template_status     @default(draft)
+  is_default      Boolean                      @default(false)
+  is_system       Boolean                      @default(false)
+  created_by      Int?
+  created_at      DateTime?                    @default(now()) @db.Timestamp(0)
+  updated_at      DateTime?                    @default(now()) @db.Timestamp(0)
+  published_at    DateTime?                    @db.Timestamp(0)
+  deleted_at      DateTime?                    @db.Timestamp(0)
+  versions        document_template_versions[]
+  companies       companies?                   @relation(fields: [company_id], references: [id], onDelete: Cascade, map: "fk_templates_company")
+  created_by_user users?                       @relation("template_created_by", fields: [created_by], references: [id], map: "fk_templates_created_by")
+
+  @@unique([company_id, name, document_type], map: "unique_template_name_per_company")
+  @@index([company_id], map: "idx_templates_company")
+  @@index([document_type], map: "idx_templates_type")
+  @@index([status], map: "idx_templates_status")
+  @@index([created_by], map: "idx_templates_created_by")
+}
+
+model document_template_versions {
+  id                Int                @id @default(autoincrement())
+  template_id       Int
+  version           Int
+  template_schema   Json
+  published_by      Int?
+  published_at      DateTime           @default(now()) @db.Timestamp(0)
+  published_by_user users?             @relation("version_published_by", fields: [published_by], references: [id], map: "fk_versions_published_by")
+  template          document_templates @relation(fields: [template_id], references: [id], onDelete: Cascade, map: "fk_versions_template")
+
+  @@unique([template_id, version], map: "unique_template_version")
+  @@index([template_id], map: "idx_versions_template")
+  @@index([published_by], map: "idx_versions_published_by")
 }
 
 enum receipts_payment_method {
@@ -346,4 +394,15 @@ enum waybills_status {
   pending
   in_transit
   delivered
+}
+
+enum document_template_type {
+  invoice
+  receipt
+  waybill
+}
+
+enum document_template_status {
+  draft
+  published
 }

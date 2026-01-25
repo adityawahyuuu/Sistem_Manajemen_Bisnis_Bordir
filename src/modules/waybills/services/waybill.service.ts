@@ -1,8 +1,9 @@
 import { prisma } from '../../../database/prisma.client';
 import { CreateWaybillDto, UpdateWaybillDto } from '../interfaces/waybill.interface';
 import { AppError } from '../../../middleware';
-import { documentGenerator } from '../../../shared/utils/document.generator';
+import { documentGenerator } from '../../../shared/utils/document.generator.util';
 import { waybills_status } from '../../../../prisma/generated/prisma';
+import { TemplateSchema } from '@/modules/templates/interfaces/template.interface';
 
 export const waybillService = {
   async findAllByCompany(
@@ -217,43 +218,115 @@ export const waybillService = {
     return true;
   },
 
-  async generate(id: number, companyId: number, userId: number) {
+  async generate(
+    id: number,
+    companyId: number,
+    userId: number,
+    templateId?: number
+  ) {
     const waybill = await this.findById(id, companyId, userId);
 
+    let template;
+
+    if (templateId) {
+      // Find specific template by ID
+      template = await prisma.document_templates.findFirst({
+        where: {
+          id: templateId,
+          document_type: 'waybill',
+          deleted_at: null,
+          OR: [{ company_id: companyId }, { is_system: true }],
+        },
+      });
+
+      if (!template) {
+        throw new AppError('Template not found', 404);
+      }
+
+      if (template.status !== 'published') {
+        throw new AppError('Template must be published before use. Please publish the template first.', 400);
+      }
+    } else {
+      // Find default template for company, or fallback to system template
+      template = await prisma.document_templates.findFirst({
+        where: {
+          document_type: 'waybill',
+          status: 'published',
+          deleted_at: null,
+          OR: [
+            { company_id: companyId, is_default: true },
+            { is_system: true },
+          ],
+        },
+        orderBy: [
+          { company_id: 'desc' },
+          { is_default: 'desc' },
+        ],
+      });
+
+      if (!template) {
+        throw new AppError('No published template available. Please create and publish a template first.', 404);
+      }
+    }
+
     const documentData = {
-      company_name: waybill.companies?.name || '',
-      company_address: [waybill.companies?.address, waybill.companies?.city, waybill.companies?.province].filter(Boolean).join(', '),
-      company_phone: waybill.companies?.phone || '',
-      waybill_number: waybill.waybill_number,
-      date: waybill.waybill_date instanceof Date
-        ? waybill.waybill_date.toLocaleDateString('id-ID')
-        : new Date(waybill.waybill_date).toLocaleDateString('id-ID'),
-      customer_name: waybill.customers?.name || '',
-      delivery_address: waybill.destination_address || '',
-      delivery_city: waybill.destination_city || '',
-      delivery_province: waybill.destination_province || '',
-      invoice_number: waybill.invoices?.invoice_number || null,
-      vehicle_number: waybill.vehicle_number || '',
-      driver_name: waybill.driver_name || '',
+      company: {
+        name: waybill.companies?.name ?? '',
+        address: [waybill.companies?.address, waybill.companies?.city, waybill.companies?.province]
+          .filter(Boolean)
+          .join(', '),
+        phone: waybill.companies?.phone ?? undefined,
+        theme: {
+          primary_color:
+            waybill.companies?.company_settings?.primary_color ?? '#333333',
+        },
+      },
+      document: {
+        number: waybill.waybill_number,
+        date: waybill.waybill_date,
+      },
+      customer: {
+        name: waybill.customers?.name ?? '',
+        delivery_address: waybill.destination_address ?? '',
+        delivery_city: waybill.destination_city ?? '',
+        delivery_province: waybill.destination_province ?? '',
+      },
+      logistics: {
+        vehicle_number: waybill.vehicle_number ?? undefined,
+        driver_name: waybill.driver_name ?? undefined,
+      },
       items: waybill.waybill_items.map((item) => ({
         description: item.item_name,
         quantity: Number(item.quantity),
-        unit: item.unit || 'pcs',
+        unit: item.unit ?? 'pcs',
       })),
-      notes: waybill.notes || '',
-      primary_color: waybill.companies?.company_settings?.primary_color || '#333333',
+      reference: {
+        invoice_number: waybill.invoices?.invoice_number ?? undefined,
+      },
+      notes: waybill.notes ?? undefined,
     };
 
-    const htmlContent = documentGenerator.generateWaybillHtml(documentData);
+    const htmlContent = documentGenerator.generateFromTemplate(
+      template.template_schema as unknown as TemplateSchema,
+      documentData
+    );
+
     const fileName = `waybill-${waybill.waybill_number.replace(/[/\\]/g, '-')}.pdf`;
+
     await documentGenerator.generatePdf(htmlContent, fileName);
 
     await prisma.waybills.update({
       where: { id },
-      data: { generated_file_path: fileName, updated_at: new Date() },
+      data: {
+        generated_file_path: fileName,
+        updated_at: new Date(),
+      },
     });
 
-    return { fileName, waybill: { ...waybill, generated_file_path: fileName } };
+    return {
+      fileName,
+      waybill: { ...waybill, generated_file_path: fileName },
+    };
   },
 
   async getFilePath(id: number, companyId: number, userId: number) {

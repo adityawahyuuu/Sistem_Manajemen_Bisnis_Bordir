@@ -41,6 +41,7 @@ export const itemService = {
     item_code: string;
     item_name: string;
     description?: string;
+    category?: string;
     unit?: string;
     unit_price?: number;
   }) {
@@ -67,6 +68,7 @@ export const itemService = {
         item_code: data.item_code,
         item_name: data.item_name,
         description: data.description,
+        category: data.category,
         unit: data.unit || 'pcs',
         unit_price: data.unit_price || 0,
         created_at: new Date(),
@@ -79,6 +81,7 @@ export const itemService = {
     item_code?: string;
     item_name?: string;
     description?: string;
+    category?: string;
     unit?: string;
     unit_price?: number;
     is_active?: boolean;

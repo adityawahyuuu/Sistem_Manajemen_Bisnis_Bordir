@@ -42,7 +42,7 @@ export interface CreateInvoiceDto {
 }
 
 export interface CreateInvoiceItemDto {
-  item_id?: number;
+  item_id: number;
   name: string;
   description?: string;
   quantity: number;
@@ -56,6 +56,7 @@ export interface UpdateInvoiceDto {
   discount_amount?: number;
   notes?: string;
   status?: invoices_status;
+  items?: CreateInvoiceItemDto[];
 }
 
 export interface InvoiceWithItems extends Invoice {

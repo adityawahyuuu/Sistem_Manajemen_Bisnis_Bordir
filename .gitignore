@@ -35,3 +35,7 @@ coverage/
 *.swo
 
 prisma/generated/
+*.md
+
+.claude
+nul

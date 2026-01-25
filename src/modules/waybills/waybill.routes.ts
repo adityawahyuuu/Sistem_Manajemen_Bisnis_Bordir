@@ -15,7 +15,7 @@ router.use(authMiddleware);
 // Waybills Routes
 /**
  * @swagger
- * /waybills/company/{companyId}:
+ * /waybills/{companyId}:
  *   get:
  *     summary: Get all waybills for a company
  *     tags: [Waybills]
@@ -59,7 +59,7 @@ router.use(authMiddleware);
  *         description: Waybills retrieved successfully
  */
 router.get(
-  '/company/:companyId',
+  '/:companyId',
   validate(companyIdParamSchema, 'params'),
   validate(waybillQuerySchema, 'query'),
   waybillController.findAllByCompany
@@ -67,7 +67,7 @@ router.get(
 
 /**
  * @swagger
- * /waybills/company/{companyId}:
+ * /waybills/{companyId}:
  *   post:
  *     summary: Create new waybill
  *     tags: [Waybills]
@@ -132,7 +132,7 @@ router.get(
  *         description: Waybill created successfully
  */
 router.post(
-  '/company/:companyId',
+  '/:companyId',
   validate(companyIdParamSchema, 'params'),
   validate(createWaybillSchema, 'body'),
   waybillController.create
@@ -140,7 +140,7 @@ router.post(
 
 /**
  * @swagger
- * /waybills/company/{companyId}/{id}:
+ * /waybills/{companyId}/{id}:
  *   get:
  *     summary: Get waybill by ID
  *     tags: [Waybills]
@@ -162,14 +162,14 @@ router.post(
  *         description: Waybill retrieved successfully
  */
 router.get(
-  '/company/:companyId/:id',
+  '/:companyId/:id',
   validate(companyIdParamSchema, 'params'),
   waybillController.findById
 );
 
 /**
  * @swagger
- * /waybills/company/{companyId}/{id}:
+ * /waybills/{companyId}/{id}:
  *   put:
  *     summary: Update waybill
  *     tags: [Waybills]
@@ -212,7 +212,7 @@ router.get(
  *         description: Waybill updated successfully
  */
 router.put(
-  '/company/:companyId/:id',
+  '/:companyId/:id',
   validate(companyIdParamSchema, 'params'),
   validate(updateWaybillSchema, 'body'),
   waybillController.update
@@ -220,7 +220,7 @@ router.put(
 
 /**
  * @swagger
- * /waybills/company/{companyId}/{id}:
+ * /waybills/{companyId}/{id}:
  *   delete:
  *     summary: Delete waybill
  *     tags: [Waybills]
@@ -242,14 +242,14 @@ router.put(
  *         description: Waybill deleted successfully
  */
 router.delete(
-  '/company/:companyId/:id',
+  '/:companyId/:id',
   validate(companyIdParamSchema, 'params'),
   waybillController.delete
 );
 
 /**
  * @swagger
- * /waybills/company/{companyId}/{id}/generate:
+ * /waybills/{companyId}/{id}/generate:
  *   post:
  *     summary: Generate PDF document for waybill
  *     tags: [Waybills]
@@ -271,14 +271,14 @@ router.delete(
  *         description: Waybill PDF generated successfully
  */
 router.post(
-  '/company/:companyId/:id/generate',
+  '/:companyId/:id/generate',
   validate(companyIdParamSchema, 'params'),
   waybillController.generate
 );
 
 /**
  * @swagger
- * /waybills/company/{companyId}/{id}/download:
+ * /waybills/{companyId}/{id}/download:
  *   get:
  *     summary: Download waybill PDF
  *     tags: [Waybills]
@@ -305,14 +305,14 @@ router.post(
  *               format: binary
  */
 router.get(
-  '/company/:companyId/:id/download',
+  '/:companyId/:id/download',
   validate(companyIdParamSchema, 'params'),
   waybillController.download
 );
 
 /**
  * @swagger
- * /waybills/company/{companyId}/{id}/status:
+ * /waybills/{companyId}/{id}/status:
  *   patch:
  *     summary: Update waybill status
  *     tags: [Waybills]
@@ -346,7 +346,7 @@ router.get(
  *         description: Waybill status updated successfully
  */
 router.patch(
-  '/company/:companyId/:id/status',
+  '/:companyId/:id/status',
   validate(companyIdParamSchema, 'params'),
   waybillController.updateStatus
 );

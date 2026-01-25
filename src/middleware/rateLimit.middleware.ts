@@ -6,7 +6,7 @@ export const generalLimiter = rateLimit({
   max: rateLimitConfig.max,
   message: {
     success: false,
-    message: 'Too many requests, please try again later',
+    message: `Too many requests, please try again later after ${rateLimitConfig.windowMs / 60000} minutes`,
   },
   standardHeaders: true,
   legacyHeaders: false,

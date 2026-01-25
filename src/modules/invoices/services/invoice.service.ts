@@ -1,8 +1,9 @@
 import { prisma } from '../../../database/prisma.client';
 import { CreateInvoiceDto, UpdateInvoiceDto } from '../interfaces/invoice.interface';
 import { AppError } from '../../../middleware';
-import { documentGenerator } from '../../../shared/utils/document.generator';
+import { documentGenerator } from '../../../shared/utils/document.generator.util';
 import { invoices_status } from '../../../../prisma/generated/prisma';
+import { TemplateSchema } from '../../templates/interfaces/template.interface';
 
 export const invoiceService = {
   /**
@@ -46,6 +47,7 @@ export const invoiceService = {
         take: limit,
         orderBy: { created_at: 'desc' },
         include: {
+          invoice_items: true,
           customers: {
             select: {
               id: true,
@@ -53,8 +55,11 @@ export const invoiceService = {
               company_name: true,
             },
           },
-          _count: {
-            select: { invoice_items: true },
+          companies: {
+            select: {
+              id: true,
+              name: true,
+            },
           },
         },
       }),
@@ -104,6 +109,7 @@ export const invoiceService = {
         take: limit,
         orderBy: { created_at: 'desc' },
         include: {
+          invoice_items: true,
           customers: {
             select: {
               id: true,
@@ -116,9 +122,6 @@ export const invoiceService = {
               id: true,
               name: true,
             },
-          },
-          _count: {
-            select: { invoice_items: true },
           },
         },
       }),
@@ -149,6 +152,13 @@ export const invoiceService = {
         companies: {
           include: {
             company_settings: true,
+          },
+        },
+        users: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
           },
         },
       },
@@ -213,6 +223,7 @@ export const invoiceService = {
         created_by: userId,
         invoice_items: {
           create: data.items.map((item) => ({
+            item_id: item.item_id,
             item_name: item.name,
             description: item.description || null,
             quantity: item.quantity,
@@ -246,6 +257,7 @@ export const invoiceService = {
     // Verify invoice belongs to company
     const existingInvoice = await prisma.invoices.findFirst({
       where: { id, company_id: companyId },
+      include: { invoice_items: true },
     });
 
     if (!existingInvoice) {
@@ -261,29 +273,63 @@ export const invoiceService = {
       throw new AppError('Cannot update paid invoice except to cancel', 400);
     }
 
-    const invoice = await prisma.invoices.update({
-      where: { id },
-      data: {
-        due_date: data.due_date ? new Date(data.due_date) : undefined,
-        tax_amount: data.tax_amount,
-        discount_amount: data.discount_amount,
-        notes: data.notes,
-        status: data.status as invoices_status,
-        // Recalculate total if tax or discount changed
-        ...(data.tax_amount !== undefined || data.discount_amount !== undefined
-          ? {
-              total_amount:
-                Number(existingInvoice.subtotal) +
-                (data.tax_amount ?? Number(existingInvoice.tax_amount)) -
-                (data.discount_amount ?? Number(existingInvoice.discount_amount)),
-            }
-          : {}),
-        updated_at: new Date(),
-      },
-      include: {
-        invoice_items: true,
-        customers: true,
-      },
+    // Calculate new subtotal if items are provided
+    let subtotal = Number(existingInvoice.subtotal);
+    if (data.items && data.items.length > 0) {
+      subtotal = data.items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
+    }
+
+    const taxAmount = data.tax_amount ?? Number(existingInvoice.tax_amount);
+    const discountAmount = data.discount_amount ?? Number(existingInvoice.discount_amount);
+    const totalAmount = subtotal + taxAmount - discountAmount;
+
+    const invoice = await prisma.$transaction(async (tx) => {
+      // Delete existing items if new items provided
+      if (data.items && data.items.length > 0) {
+        await tx.invoice_items.deleteMany({
+          where: { invoice_id: id },
+        });
+      }
+
+      // Update invoice
+      return tx.invoices.update({
+        where: { id },
+        data: {
+          due_date: data.due_date ? new Date(data.due_date) : undefined,
+          tax_amount: taxAmount,
+          discount_amount: discountAmount,
+          subtotal: data.items ? subtotal : undefined,
+          total_amount: totalAmount,
+          notes: data.notes,
+          status: data.status as invoices_status,
+          updated_at: new Date(),
+          // Create new items if provided
+          ...(data.items && data.items.length > 0
+            ? {
+                invoice_items: {
+                  create: data.items.map((item) => ({
+                    item_id: item.item_id,
+                    item_name: item.name,
+                    description: item.description || null,
+                    quantity: item.quantity,
+                    unit_price: item.unit_price,
+                    total_price: item.quantity * item.unit_price,
+                  })),
+                },
+              }
+            : {}),
+        },
+        include: {
+          invoice_items: true,
+          customers: true,
+          companies: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
     });
 
     return invoice;
@@ -326,7 +372,7 @@ export const invoiceService = {
       documentGenerator.deleteFile(existingInvoice.generated_file_path);
     }
 
-    // Delete invoice (cascade will delete invoice_items)
+    // Delete invoice (cascade will delete invoice_items via onDelete: Cascade in schema)
     await prisma.invoices.delete({ where: { id } });
 
     return true;
@@ -334,75 +380,112 @@ export const invoiceService = {
 
   /**
    * Generate PDF for invoice
+   * @param id - Invoice ID
+   * @param companyId - Company ID
+   * @param userId - User ID
+   * @param templateId - Optional template ID (if not provided, uses default template or legacy method)
    */
-  async generate(id: number, companyId: number, userId: number) {
+  async generate(id: number, companyId: number, userId: number, templateId?: number) {
     const invoice = await this.findById(id, companyId, userId);
-
-    // Prepare document data
     const documentData = {
-      // Company info
-      company_name: invoice.companies?.name || '',
-      company_address: [
-        invoice.companies?.address,
-        invoice.companies?.city,
-        invoice.companies?.province,
-      ]
-        .filter(Boolean)
-        .join(', '),
-      company_phone: invoice.companies?.phone || '',
-      company_email: invoice.companies?.email || '',
-      company_logo: invoice.companies?.company_settings?.logo_url || null,
-      primary_color: invoice.companies?.company_settings?.primary_color || '#000000',
-      // Invoice info
-      invoice_number: invoice.invoice_number,
-      date:
-        invoice.invoice_date instanceof Date
-          ? invoice.invoice_date.toLocaleDateString('id-ID')
-          : new Date(invoice.invoice_date).toLocaleDateString('id-ID'),
-      due_date: invoice.due_date
-        ? invoice.due_date instanceof Date
-          ? invoice.due_date.toLocaleDateString('id-ID')
-          : new Date(invoice.due_date).toLocaleDateString('id-ID')
-        : '-',
-      status: invoice.status,
-      // Customer info
-      customer_name: invoice.customers?.name || '',
-      customer_company: invoice.customers?.company_name || '',
-      customer_address: [
-        invoice.customers?.address,
-        invoice.customers?.city,
-        invoice.customers?.province,
-      ]
-        .filter(Boolean)
-        .join(', '),
-      customer_phone: invoice.customers?.phone || '',
-      // Items
-      items: invoice.invoice_items.map((item) => ({
-        description: item.item_name + (item.description ? ` - ${item.description}` : ''),
+    company: {
+        name: invoice.companies?.name ?? '',
+        address: [
+          invoice.companies?.address,
+          invoice.companies?.city,
+          invoice.companies?.province,
+        ].filter(Boolean).join(', '),
+        phone: invoice.companies?.phone ?? '',
+        email: invoice.companies?.email ?? '',
+        logo_url: invoice.companies?.company_settings?.logo_url,
+        primary_color: invoice.companies?.company_settings?.primary_color,
+      },
+      document: {
+        number: invoice.invoice_number,
+        date: invoice.invoice_date.toISOString(),
+        due_date: invoice.due_date?.toISOString(),
+        status: invoice.status,
+      },
+      customer: {
+        name: invoice.customers?.name ?? '',
+        company: invoice.customers?.company_name ?? '',
+        address: [
+          invoice.customers?.address,
+          invoice.customers?.city,
+          invoice.customers?.province,
+        ].filter(Boolean).join(', '),
+        phone: invoice.customers?.phone ?? '',
+      },
+      items: invoice.invoice_items.map(item => ({
+        name: item.item_name,
+        description: item.description,
         quantity: item.quantity,
-        unit: 'pcs',
         unit_price: Number(item.unit_price),
-        total: Number(item.total_price),
+        total_price: Number(item.total_price),
       })),
-      // Totals
-      subtotal: Number(invoice.subtotal),
-      discount: Number(invoice.discount_amount),
-      tax: Number(invoice.tax_amount),
-      total: Number(invoice.total_amount),
-      notes: invoice.notes || '',
-      // Settings
-      terms_conditions: invoice.companies?.company_settings?.terms_conditions || '',
-      footer_text: invoice.companies?.company_settings?.footer_text || '',
-      show_tax_column: invoice.companies?.company_settings?.show_tax_column ?? true,
-      show_discount_column: invoice.companies?.company_settings?.show_discount_column ?? true,
+      totals: {
+        subtotal: Number(invoice.subtotal),
+        discount: Number(invoice.discount_amount) || undefined,
+        tax: Number(invoice.tax_amount) || undefined,
+        total: Number(invoice.total_amount),
+      },
+      notes: invoice.notes ?? undefined,
     };
 
-    // Generate PDF
-    const htmlContent = documentGenerator.generateInvoiceHtml(documentData);
-    const fileName = `invoice-${invoice.invoice_number.replace(/[/\\]/g, '-')}.pdf`;
+    let template;
+
+    if (templateId) {
+      // Find specific template by ID
+      template = await prisma.document_templates.findFirst({
+        where: {
+          id: templateId,
+          document_type: 'invoice',
+          deleted_at: null,
+          OR: [{ company_id: companyId }, { is_system: true }],
+        },
+      });
+
+      if (!template) {
+        throw new AppError('Template not found', 404);
+      }
+
+      if (template.status !== 'published') {
+        throw new AppError('Template must be published before use. Please publish the template first.', 400);
+      }
+    } else {
+      // Find default template for company, or fallback to system template
+      template = await prisma.document_templates.findFirst({
+        where: {
+          document_type: 'invoice',
+          status: 'published',
+          deleted_at: null,
+          OR: [
+            { company_id: companyId, is_default: true },
+            { is_system: true },
+          ],
+        },
+        orderBy: [
+          { company_id: 'desc' }, // Prefer company template over system
+          { is_default: 'desc' }, // Prefer default template
+        ],
+      });
+
+      if (!template) {
+        throw new AppError('No published template available. Please create and publish a template first.', 404);
+      }
+    }
+
+    const templateSchema = template.template_schema as unknown as TemplateSchema;
+
+    const htmlContent = documentGenerator.generateFromTemplate(
+      templateSchema,
+      documentData
+    );
+
+    const fileName = `document-${invoice.invoice_number.replace(/[/\\]/g, '-')}.pdf`;
+
     await documentGenerator.generatePdf(htmlContent, fileName);
 
-    // Update invoice with file path
     await prisma.invoices.update({
       where: { id },
       data: {
@@ -413,7 +496,6 @@ export const invoiceService = {
 
     return {
       fileName,
-      invoice: { ...invoice, generated_file_path: fileName },
     };
   },
 

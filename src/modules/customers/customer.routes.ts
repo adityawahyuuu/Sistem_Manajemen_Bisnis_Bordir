@@ -16,7 +16,7 @@ router.use(authMiddleware);
 
 /**
  * @swagger
- * /customers/company/{companyId}:
+ * /customers/{companyId}:
  *   get:
  *     summary: Get all customers for a company
  *     tags: [Customers]
@@ -52,11 +52,11 @@ router.use(authMiddleware);
  *       404:
  *         description: Company not found
  */
-router.get('/company/:companyId', customerController.findAll);
+router.get('/:companyId', customerController.findAll);
 
 /**
  * @swagger
- * /customers/company/{companyId}:
+ * /customers/{companyId}:
  *   post:
  *     summary: Create a new customer for a company
  *     tags: [Customers]
@@ -117,11 +117,11 @@ router.get('/company/:companyId', customerController.findAll);
  *       404:
  *         description: Company not found
  */
-router.post('/company/:companyId', validate(createCustomerSchema), customerController.create);
+router.post('/:companyId', validate(createCustomerSchema), customerController.create);
 
 /**
  * @swagger
- * /customers/company/{companyId}/{customerId}:
+ * /customers/{companyId}/{customerId}:
  *   get:
  *     summary: Get customer by ID
  *     tags: [Customers]
@@ -148,11 +148,11 @@ router.post('/company/:companyId', validate(createCustomerSchema), customerContr
  *       404:
  *         description: Customer or company not found
  */
-router.get('/company/:companyId/:customerId', customerController.findById);
+router.get('/:companyId/:customerId', customerController.findById);
 
 /**
  * @swagger
- * /customers/company/{companyId}/{customerId}:
+ * /customers/{companyId}/{customerId}:
  *   put:
  *     summary: Update customer
  *     tags: [Customers]
@@ -208,11 +208,11 @@ router.get('/company/:companyId/:customerId', customerController.findById);
  *       404:
  *         description: Customer or company not found
  */
-router.put('/company/:companyId/:customerId', validate(updateCustomerSchema), customerController.update);
+router.put('/:companyId/:customerId', validate(updateCustomerSchema), customerController.update);
 
 /**
  * @swagger
- * /customers/company/{companyId}/{customerId}:
+ * /customers/{companyId}/{customerId}:
  *   delete:
  *     summary: Delete customer
  *     tags: [Customers]
@@ -239,6 +239,6 @@ router.put('/company/:companyId/:customerId', validate(updateCustomerSchema), cu
  *       404:
  *         description: Customer or company not found
  */
-router.delete('/company/:companyId/:customerId', customerController.delete);
+router.delete('/:companyId/:customerId', customerController.delete);
 
 export default router;

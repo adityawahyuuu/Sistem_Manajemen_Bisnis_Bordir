@@ -16,7 +16,7 @@ router.use(authMiddleware);
 // Invoices Routes
 /**
  * @swagger
- * /invoices/company/{companyId}:
+ * /invoices/{companyId}:
  *   get:
  *     summary: Get all invoices for a company
  *     tags: [Invoices]
@@ -62,11 +62,11 @@ router.use(authMiddleware);
  *       404:
  *         description: Company not found
  */
-router.get('/company/:companyId', validate(companyIdParamSchema, 'params'), validate(invoiceQuerySchema, 'query'), invoiceController.findAllByCompany);
+router.get('/:companyId', validate(companyIdParamSchema, 'params'), validate(invoiceQuerySchema, 'query'), invoiceController.findAllByCompany);
 
 /**
  * @swagger
- * /invoices/company/{companyId}:
+ * /invoices/{companyId}:
  *   post:
  *     summary: Create a new invoice
  *     tags: [Invoices]
@@ -128,11 +128,11 @@ router.get('/company/:companyId', validate(companyIdParamSchema, 'params'), vali
  *       404:
  *         description: Company or customer not found
  */
-router.post('/company/:companyId', validate(companyIdParamSchema, 'params'), validate(createInvoiceSchema, 'body'), invoiceController.create);
+router.post('/:companyId', validate(companyIdParamSchema, 'params'), validate(createInvoiceSchema, 'body'), invoiceController.create);
 
 /**
  * @swagger
- * /invoices/company/{companyId}/{id}:
+ * /invoices/{companyId}/{id}:
  *   get:
  *     summary: Get invoice by ID
  *     tags: [Invoices]
@@ -159,11 +159,11 @@ router.post('/company/:companyId', validate(companyIdParamSchema, 'params'), val
  *       404:
  *         description: Invoice or company not found
  */
-router.get('/company/:companyId/:id', validate(companyIdParamSchema, 'params'), invoiceController.findById);
+router.get('/:companyId/:id', validate(companyIdParamSchema, 'params'), invoiceController.findById);
 
 /**
  * @swagger
- * /invoices/company/{companyId}/{id}:
+ * /invoices/{companyId}/{id}:
  *   put:
  *     summary: Update invoice
  *     tags: [Invoices]
@@ -213,11 +213,11 @@ router.get('/company/:companyId/:id', validate(companyIdParamSchema, 'params'), 
  *       404:
  *         description: Invoice or company not found
  */
-router.put('/company/:companyId/:id', validate(companyIdParamSchema, 'params'), validate(updateInvoiceSchema, 'body'), invoiceController.update);
+router.put('/:companyId/:id', validate(companyIdParamSchema, 'params'), validate(updateInvoiceSchema, 'body'), invoiceController.update);
 
 /**
  * @swagger
- * /invoices/company/{companyId}/{id}:
+ * /invoices/{companyId}/{id}:
  *   delete:
  *     summary: Delete invoice
  *     tags: [Invoices]
@@ -246,11 +246,11 @@ router.put('/company/:companyId/:id', validate(companyIdParamSchema, 'params'), 
  *       404:
  *         description: Invoice or company not found
  */
-router.delete('/company/:companyId/:id', validate(companyIdParamSchema, 'params'), invoiceController.delete);
+router.delete('/:companyId/:id', validate(companyIdParamSchema, 'params'), invoiceController.delete);
 
 /**
  * @swagger
- * /invoices/company/{companyId}/{id}/generate:
+ * /invoices/{companyId}/{id}/generate:
  *   post:
  *     summary: Generate PDF document for invoice
  *     tags: [Invoices]
@@ -296,11 +296,11 @@ router.delete('/company/:companyId/:id', validate(companyIdParamSchema, 'params'
  *       404:
  *         description: Invoice or company not found
  */
-router.post('/company/:companyId/:id/generate', validate(companyIdParamSchema, 'params'), invoiceController.generate);
+router.post('/:companyId/:id/generate', validate(companyIdParamSchema, 'params'), invoiceController.generate);
 
 /**
  * @swagger
- * /invoices/company/{companyId}/{id}/download:
+ * /invoices/{companyId}/{id}/download:
  *   get:
  *     summary: Download invoice PDF
  *     tags: [Invoices]
@@ -334,11 +334,11 @@ router.post('/company/:companyId/:id/generate', validate(companyIdParamSchema, '
  *       404:
  *         description: Invoice, company, or file not found
  */
-router.get('/company/:companyId/:id/download', validate(companyIdParamSchema, 'params'), invoiceController.download);
+router.get('/:companyId/:id/download', validate(companyIdParamSchema, 'params'), invoiceController.download);
 
 /**
  * @swagger
- * /invoices/company/{companyId}/{id}/status:
+ * /invoices/{companyId}/{id}/status:
  *   patch:
  *     summary: Update invoice status
  *     tags: [Invoices]
@@ -379,6 +379,6 @@ router.get('/company/:companyId/:id/download', validate(companyIdParamSchema, 'p
  *       404:
  *         description: Invoice or company not found
  */
-router.patch('/company/:companyId/:id/status', validate(companyIdParamSchema, 'params'), invoiceController.updateStatus);
+router.patch('/:companyId/:id/status', validate(companyIdParamSchema, 'params'), invoiceController.updateStatus);
 
 export default router;

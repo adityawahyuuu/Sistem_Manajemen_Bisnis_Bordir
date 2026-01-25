@@ -123,19 +123,23 @@ export const invoiceController = {
   /**
    * Generate PDF for invoice
    * POST /invoices/company/:companyId/:id/generate
+   * Query params:
+   *   - templateId: (optional) ID of the template to use
    */
   async generate(req: Request, res: Response, next: NextFunction) {
     try {
       const id = parseInt(req.params.id);
       const companyId = parseInt(req.params.companyId);
       const userId = parseInt(req.user!.id);
+      const templateId = req.query.templateId
+        ? parseInt(req.query.templateId as string)
+        : undefined;
 
-      const result = await invoiceService.generate(id, companyId, userId);
+      const result = await invoiceService.generate(id, companyId, userId, templateId);
       sendSuccessWithDates(
         res,
         {
-          fileName: result.fileName,
-          invoice: result.invoice,
+          fileName: result.fileName
         },
         'Invoice document generated successfully'
       );

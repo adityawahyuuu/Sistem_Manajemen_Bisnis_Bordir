@@ -1,8 +1,9 @@
 import { prisma } from '../../../database/prisma.client';
 import { CreateReceiptDto, UpdateReceiptDto } from '../interfaces/receipt.interface';
 import { AppError } from '../../../middleware';
-import { documentGenerator } from '../../../shared/utils/document.generator';
+import { documentGenerator } from '../../../shared/utils/document.generator.util';
 import { receipts_payment_method } from '../../../../prisma/generated/prisma';
+import { TemplateSchema } from '@/modules/templates/interfaces/template.interface';
 
 export const receiptService = {
   async findAllByCompany(
@@ -186,37 +187,124 @@ export const receiptService = {
     return true;
   },
 
-  async generate(id: number, companyId: number, userId: number) {
+  async generate(
+    id: number,
+    companyId: number,
+    userId: number,
+    templateId?: number
+  ) {
     const receipt = await this.findById(id, companyId, userId);
 
+    let template;
+
+    if (templateId) {
+      // Find specific template by ID
+      template = await prisma.document_templates.findFirst({
+        where: {
+          id: templateId,
+          document_type: 'receipt',
+          deleted_at: null,
+          OR: [{ company_id: companyId }, { is_system: true }],
+        },
+      });
+
+      if (!template) {
+        throw new AppError('Template not found', 404);
+      }
+
+      if (template.status !== 'published') {
+        throw new AppError('Template must be published before use. Please publish the template first.', 400);
+      }
+    } else {
+      // Find default template for company, or fallback to system template
+      template = await prisma.document_templates.findFirst({
+        where: {
+          document_type: 'receipt',
+          status: 'published',
+          deleted_at: null,
+          OR: [
+            { company_id: companyId, is_default: true },
+            { is_system: true },
+          ],
+        },
+        orderBy: [
+          { company_id: 'desc' },
+          { is_default: 'desc' },
+        ],
+      });
+
+      if (!template) {
+        throw new AppError('No published template available. Please create and publish a template first.', 404);
+      }
+    }
+
+    // 2. Backend hanya mapping data (tanpa layout)
     const documentData = {
-      company_name: receipt.companies?.name || '',
-      company_address: [receipt.companies?.address, receipt.companies?.city, receipt.companies?.province].filter(Boolean).join(', '),
-      company_phone: receipt.companies?.phone || '',
-      receipt_number: receipt.receipt_number,
-      receipt_date: receipt.receipt_date instanceof Date
-        ? receipt.receipt_date.toLocaleDateString('id-ID')
-        : new Date(receipt.receipt_date).toLocaleDateString('id-ID'),
-      customer_name: receipt.customers?.name || '',
-      amount: Number(receipt.amount),
-      payment_method: receipt.payment_method,
-      invoice_number: receipt.invoices?.invoice_number || null,
-      description: receipt.description || 'Pembayaran',
-      received_by: receipt.received_by,
-      notes: receipt.notes,
-      primary_color: receipt.companies?.company_settings?.primary_color || '#333333',
+      company: {
+        name: receipt.companies?.name,
+        address: [
+          receipt.companies?.address,
+          receipt.companies?.city,
+          receipt.companies?.province,
+        ]
+          .filter(Boolean)
+          .join(', '),
+        phone: receipt.companies?.phone,
+        theme: {
+          primary_color:
+            receipt.companies?.company_settings?.primary_color ?? '#333333',
+        },
+      },
+
+      document: {
+        number: receipt.receipt_number,
+        date: receipt.receipt_date,
+      },
+
+      customer: {
+        name: receipt.customers?.name,
+      },
+
+      payment: {
+        amount: Number(receipt.amount),
+        method: receipt.payment_method,
+        invoice_number: receipt.invoices?.invoice_number ?? undefined,
+        description: receipt.description ?? undefined,
+        received_by: receipt.received_by,
+      },
+
+      notes: receipt.notes ?? undefined,
     };
 
-    const htmlContent = documentGenerator.generateReceiptHtml(documentData);
+    // 3. Render HTML via schema-driven engine
+    const templateSchema = template.template_schema as unknown as TemplateSchema;
+
+    const htmlContent = documentGenerator.generateFromTemplate(
+      templateSchema,
+      documentData
+    );
+
+    // 4. Generate PDF
     const fileName = `receipt-${receipt.receipt_number.replace(/[/\\]/g, '-')}.pdf`;
+
     await documentGenerator.generatePdf(htmlContent, fileName);
 
+    // 5. Persist hasil
     await prisma.receipts.update({
       where: { id },
-      data: { generated_file_path: fileName, updated_at: new Date() },
+      data: {
+        generated_file_path: fileName,
+        updated_at: new Date(),
+      },
     });
 
-    return { fileName, receipt: { ...receipt, generated_file_path: fileName } };
+    return {
+      fileName,
+      receipt: {
+        ...receipt,
+        generated_file_path: fileName,
+      },
+    };
   },
 
   async getFilePath(id: number, companyId: number, userId: number) {

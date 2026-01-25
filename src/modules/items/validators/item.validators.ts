@@ -20,6 +20,7 @@ export const createItemSchema = Joi.object({
   description: Joi.string().optional().allow(null, ''),
   unit: Joi.string().max(50).optional(),
   unit_price: Joi.number().min(0).optional().default(0),
+  category: Joi.string().optional().allow(null, ''),
 });
 
 export const updateItemSchema = Joi.object({
@@ -29,10 +30,11 @@ export const updateItemSchema = Joi.object({
   unit: Joi.string().max(50).optional(),
   unit_price: Joi.number().min(0).optional(),
   is_active: Joi.boolean().optional(),
+  category: Joi.string().optional().allow(null, ''),
 });
 
 export const addCustomerItemSchema = Joi.object({
-  item_id: Joi.number().integer().positive().required(),
+  id: Joi.number().integer().positive().required(),
   custom_price: Joi.number().min(0).optional().allow(null),
   notes: Joi.string().optional().allow(null, ''),
 });

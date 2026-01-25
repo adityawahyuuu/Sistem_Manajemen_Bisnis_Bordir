@@ -14,7 +14,7 @@ router.use(authMiddleware);
 // Company Items Routes
 /**
  * @swagger
- * /items/company/{companyId}:
+ * /items/{companyId}:
  *   get:
  *     summary: Get all items for company
  *     tags: [Items]
@@ -30,11 +30,11 @@ router.use(authMiddleware);
  *       200:
  *         description: Items retrieved successfully
  */
-router.get('/company/:companyId', itemController.getAllItems);
+router.get('/:companyId', itemController.getAllItems);
 
 /**
  * @swagger
- * /items/company/{companyId}/{itemId}:
+ * /items/{companyId}/{itemId}:
  *   get:
  *     summary: Get item by ID
  *     tags: [Items]
@@ -55,11 +55,11 @@ router.get('/company/:companyId', itemController.getAllItems);
  *       200:
  *         description: Item retrieved successfully
  */
-router.get('/company/:companyId/:itemId', itemController.getItemById);
+router.get('/:companyId/:itemId', itemController.getItemById);
 
 /**
  * @swagger
- * /items/company/{companyId}:
+ * /items/{companyId}:
  *   post:
  *     summary: Create new item
  *     tags: [Items]
@@ -99,11 +99,11 @@ router.get('/company/:companyId/:itemId', itemController.getItemById);
  *       201:
  *         description: Item created successfully
  */
-router.post('/company/:companyId', validate(createItemSchema), itemController.createItem);
+router.post('/:companyId', validate(createItemSchema), itemController.createItem);
 
 /**
  * @swagger
- * /items/company/{companyId}/{itemId}:
+ * /items/{companyId}/{itemId}:
  *   put:
  *     summary: Update item
  *     tags: [Items]
@@ -136,11 +136,11 @@ router.post('/company/:companyId', validate(createItemSchema), itemController.cr
  *       200:
  *         description: Item updated successfully
  */
-router.put('/company/:companyId/:itemId', validate(updateItemSchema), itemController.updateItem);
+router.put('/:companyId/:itemId', validate(updateItemSchema), itemController.updateItem);
 
 /**
  * @swagger
- * /items/company/{companyId}/{itemId}:
+ * /items/{companyId}/{itemId}:
  *   delete:
  *     summary: Delete item
  *     tags: [Items]
@@ -161,12 +161,12 @@ router.put('/company/:companyId/:itemId', validate(updateItemSchema), itemContro
  *       200:
  *         description: Item deleted successfully
  */
-router.delete('/company/:companyId/:itemId', itemController.deleteItem);
+router.delete('/:companyId/:itemId', itemController.deleteItem);
 
 // Customer Items Routes
 /**
  * @swagger
- * /items/customer/{companyId}/{customerId}:
+ * /items/{companyId}/{customerId}:
  *   get:
  *     summary: Get all items for specific customer
  *     tags: [Items]
@@ -187,11 +187,11 @@ router.delete('/company/:companyId/:itemId', itemController.deleteItem);
  *       200:
  *         description: Customer items retrieved successfully
  */
-router.get('/customer/:companyId/:customerId', itemController.getCustomerItems);
+router.get('/:companyId/:customerId', itemController.getCustomerItems);
 
 /**
  * @swagger
- * /items/customer/{companyId}/{customerId}:
+ * /items/{companyId}/{customerId}:
  *   post:
  *     summary: Add item to customer with custom price
  *     tags: [Items]
@@ -215,9 +215,9 @@ router.get('/customer/:companyId/:customerId', itemController.getCustomerItems);
  *           schema:
  *             type: object
  *             required:
- *               - item_id
+ *               - id
  *             properties:
- *               item_id:
+ *               id:
  *                 type: integer
  *               custom_price:
  *                 type: number
@@ -227,11 +227,11 @@ router.get('/customer/:companyId/:customerId', itemController.getCustomerItems);
  *       201:
  *         description: Item added to customer successfully
  */
-router.post('/customer/:companyId/:customerId', validate(addCustomerItemSchema), itemController.addItemToCustomer);
+router.post('/:companyId/:customerId', validate(addCustomerItemSchema), itemController.addItemToCustomer);
 
 /**
  * @swagger
- * /items/customer/{companyId}/{customerId}/{customerItemId}:
+ * /items/{companyId}/{customerId}/{customerItemId}:
  *   delete:
  *     summary: Remove item from customer
  *     tags: [Items]
@@ -257,6 +257,6 @@ router.post('/customer/:companyId/:customerId', validate(addCustomerItemSchema),
  *       200:
  *         description: Item removed from customer successfully
  */
-router.delete('/customer/:companyId/:customerId/:customerItemId', itemController.removeItemFromCustomer);
+router.delete('/:companyId/:customerId/:customerItemId', itemController.removeItemFromCustomer);
 
 export default router;

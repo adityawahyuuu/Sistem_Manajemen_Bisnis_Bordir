@@ -15,7 +15,7 @@ router.use(authMiddleware);
 // Receipts Routes
 /**
  * @swagger
- * /receipts/company/{companyId}:
+ * /receipts/{companyId}:
  *   get:
  *     summary: Get all receipts for a company
  *     tags: [Receipts]
@@ -59,7 +59,7 @@ router.use(authMiddleware);
  *         description: Receipts retrieved successfully
  */
 router.get(
-  '/company/:companyId',
+  '/:companyId',
   validate(companyIdParamSchema, 'params'),
   validate(receiptQuerySchema, 'query'),
   receiptController.findAllByCompany
@@ -67,7 +67,7 @@ router.get(
 
 /**
  * @swagger
- * /receipts/company/{companyId}:
+ * /receipts/{companyId}:
  *   post:
  *     summary: Create new receipt
  *     tags: [Receipts]
@@ -116,7 +116,7 @@ router.get(
  *         description: Receipt created successfully
  */
 router.post(
-  '/company/:companyId',
+  '/:companyId',
   validate(companyIdParamSchema, 'params'),
   validate(createReceiptSchema, 'body'),
   receiptController.create
@@ -124,7 +124,7 @@ router.post(
 
 /**
  * @swagger
- * /receipts/company/{companyId}/{id}:
+ * /receipts/{companyId}/{id}:
  *   get:
  *     summary: Get receipt by ID
  *     tags: [Receipts]
@@ -146,14 +146,14 @@ router.post(
  *         description: Receipt retrieved successfully
  */
 router.get(
-  '/company/:companyId/:id',
+  '/:companyId/:id',
   validate(companyIdParamSchema, 'params'),
   receiptController.findById
 );
 
 /**
  * @swagger
- * /receipts/company/{companyId}/{id}:
+ * /receipts/{companyId}/{id}:
  *   put:
  *     summary: Update receipt
  *     tags: [Receipts]
@@ -192,7 +192,7 @@ router.get(
  *         description: Receipt updated successfully
  */
 router.put(
-  '/company/:companyId/:id',
+  '/:companyId/:id',
   validate(companyIdParamSchema, 'params'),
   validate(updateReceiptSchema, 'body'),
   receiptController.update
@@ -200,7 +200,7 @@ router.put(
 
 /**
  * @swagger
- * /receipts/company/{companyId}/{id}:
+ * /receipts/{companyId}/{id}:
  *   delete:
  *     summary: Delete receipt
  *     tags: [Receipts]
@@ -222,14 +222,14 @@ router.put(
  *         description: Receipt deleted successfully
  */
 router.delete(
-  '/company/:companyId/:id',
+  '/:companyId/:id',
   validate(companyIdParamSchema, 'params'),
   receiptController.delete
 );
 
 /**
  * @swagger
- * /receipts/company/{companyId}/{id}/generate:
+ * /receipts/{companyId}/{id}/generate:
  *   post:
  *     summary: Generate PDF document for receipt
  *     tags: [Receipts]
@@ -251,14 +251,14 @@ router.delete(
  *         description: Receipt PDF generated successfully
  */
 router.post(
-  '/company/:companyId/:id/generate',
+  '/:companyId/:id/generate',
   validate(companyIdParamSchema, 'params'),
   receiptController.generate
 );
 
 /**
  * @swagger
- * /receipts/company/{companyId}/{id}/download:
+ * /receipts/{companyId}/{id}/download:
  *   get:
  *     summary: Download receipt PDF
  *     tags: [Receipts]
@@ -285,7 +285,7 @@ router.post(
  *               format: binary
  */
 router.get(
-  '/company/:companyId/:id/download',
+  '/:companyId/:id/download',
   validate(companyIdParamSchema, 'params'),
   receiptController.download
 );

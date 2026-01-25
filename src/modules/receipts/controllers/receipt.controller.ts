@@ -91,15 +91,27 @@ export const receiptController = {
 
   async generate(req: Request, res: Response, next: NextFunction) {
     try {
-      const id = parseInt(req.params.id);
-      const companyId = parseInt(req.params.companyId);
-      const userId = parseInt(req.user!.id);
+      const id = Number(req.params.id);
+      const companyId = Number(req.params.companyId);
+      const userId = Number(req.user!.id);
+      const templateId = req.query.templateId
+        ? Number(req.query.templateId)
+        : undefined;
 
-      const result = await receiptService.generate(id, companyId, userId);
-      sendSuccessWithDates(res, {
-        fileName: result.fileName,
-        receipt: result.receipt,
-      }, 'Receipt document generated successfully');
+      const result = await receiptService.generate(
+        id,
+        companyId,
+        userId,
+        templateId
+      );
+      sendSuccessWithDates(
+        res,
+        {
+          fileName: result.fileName,
+          receipt: result.receipt,
+        },
+        'Receipt document generated successfully'
+      );
     } catch (error) {
       next(error);
     }

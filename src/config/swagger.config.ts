@@ -132,6 +132,7 @@ const options: swaggerJsdoc.Options = {
         path.join(__dirname, '../modules/invoices/invoice.routes.js'),
         path.join(__dirname, '../modules/receipts/receipt.routes.js'),
         path.join(__dirname, '../modules/waybills/waybill.routes.js'),
+        path.join(__dirname, '../modules/templates/templates.routes.js'),
         path.join(__dirname, '../routes/*.js')
       ]
     : [
@@ -142,6 +143,7 @@ const options: swaggerJsdoc.Options = {
         path.join(__dirname, '../modules/invoices/invoice.routes.ts'),
         path.join(__dirname, '../modules/receipts/receipt.routes.ts'),
         path.join(__dirname, '../modules/waybills/waybill.routes.ts'),
+        path.join(__dirname, '../modules/templates/templates.routes.ts'),
         path.join(__dirname, '../routes/*.ts')
       ],
 };
