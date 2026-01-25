@@ -52,16 +52,32 @@ export const templateService = {
   /**
    * Get all system preset templates
    */
-  async findAllPresets(documentType?: document_template_type) {
+  async findAllPresets() {
     const where: Record<string, unknown> = {
+      company_id: null,
       is_system: true,
       deleted_at: null,
-      ...(documentType && { document_type: documentType }),
     };
 
     return prisma.document_templates.findMany({
       where,
       orderBy: { name: 'asc' },
+    });
+  },
+
+  /**
+   * Get all company templates (one per document type max)
+   * Returns only templates owned by the company that are not deleted
+   */
+  async findDefaultPresets(companyId: number, userId: number) {
+    await this.verifyCompanyAccess(companyId, userId);
+
+    return prisma.document_templates.findMany({
+      where: {
+        company_id: companyId,
+        deleted_at: null,
+      },
+      orderBy: { document_type: 'asc' },
     });
   },
 
@@ -160,15 +176,15 @@ export const templateService = {
 
   /**
    * Create a new template
+   * Note: Each company can only have ONE template per document_type
    */
   async create(companyId: number, userId: number, data: CreateTemplateDto) {
     await this.verifyCompanyAccess(companyId, userId);
 
-    // Check for duplicate name
+    // Check if company already has a template for this document type
     const existing = await prisma.document_templates.findFirst({
       where: {
         company_id: companyId,
-        name: data.name,
         document_type: data.document_type,
         deleted_at: null,
       },
@@ -176,22 +192,9 @@ export const templateService = {
 
     if (existing) {
       throw new AppError(
-        `Template with name "${data.name}" already exists for this document type`,
+        `Company already has a template for document type "${data.document_type}". Each company can only have one template per document type.`,
         409
       );
-    }
-
-    // If setting as default, unset other defaults
-    if (data.is_default) {
-      await prisma.document_templates.updateMany({
-        where: {
-          company_id: companyId,
-          document_type: data.document_type,
-          is_default: true,
-          deleted_at: null,
-        },
-        data: { is_default: false },
-      });
     }
 
     return prisma.document_templates.create({
@@ -203,7 +206,7 @@ export const templateService = {
         template_schema: data.template_schema as object,
         version: 1,
         status: document_template_status.draft,
-        is_default: data.is_default || false,
+        is_default: true, // Auto set as default since only one allowed
         is_system: false,
         created_by: userId,
       },
@@ -225,47 +228,12 @@ export const templateService = {
       throw new AppError('Cannot modify system preset template', 403);
     }
 
-    // Check for duplicate name if name is being changed
-    if (data.name && data.name !== template.name) {
-      const existing = await prisma.document_templates.findFirst({
-        where: {
-          company_id: companyId,
-          name: data.name,
-          document_type: template.document_type,
-          id: { not: id },
-          deleted_at: null,
-        },
-      });
-
-      if (existing) {
-        throw new AppError(
-          `Template with name "${data.name}" already exists for this document type`,
-          409
-        );
-      }
-    }
-
-    // If setting as default, unset other defaults
-    if (data.is_default && !template.is_default) {
-      await prisma.document_templates.updateMany({
-        where: {
-          company_id: companyId,
-          document_type: template.document_type,
-          is_default: true,
-          id: { not: id },
-          deleted_at: null,
-        },
-        data: { is_default: false },
-      });
-    }
-
     return prisma.document_templates.update({
       where: { id },
       data: {
         ...(data.name && { name: data.name }),
         ...(data.description !== undefined && { description: data.description }),
         ...(data.template_schema && { template_schema: data.template_schema as object }),
-        ...(data.is_default !== undefined && { is_default: data.is_default }),
         status: document_template_status.draft, // Any update sets status back to draft
         updated_at: new Date(),
       },
@@ -550,11 +518,10 @@ export const templateService = {
       sourceTemplate = await this.findPresetById(id);
     }
 
-    // Check for duplicate name
+    // Check if company already has a template for this document type
     const existing = await prisma.document_templates.findFirst({
       where: {
         company_id: companyId,
-        name: newName,
         document_type: sourceTemplate.document_type,
         deleted_at: null,
       },
@@ -562,7 +529,7 @@ export const templateService = {
 
     if (existing) {
       throw new AppError(
-        `Template with name "${newName}" already exists for this document type`,
+        `Company already has a template for document type "${sourceTemplate.document_type}". Each company can only have one template per document type.`,
         409
       );
     }
@@ -576,40 +543,9 @@ export const templateService = {
         template_schema: sourceTemplate.template_schema as object,
         version: 1,
         status: document_template_status.draft,
-        is_default: false,
+        is_default: true, // Auto set as default since only one allowed
         is_system: false,
         created_by: userId,
-      },
-    });
-  },
-
-  /**
-   * Set template as default
-   */
-  async setAsDefault(id: number, companyId: number, userId: number) {
-    const template = await this.findById(id, companyId, userId);
-
-    if (template.is_system) {
-      throw new AppError('Cannot set system preset as default', 403);
-    }
-
-    // Unset other defaults for this document type
-    await prisma.document_templates.updateMany({
-      where: {
-        company_id: companyId,
-        document_type: template.document_type,
-        is_default: true,
-        id: { not: id },
-        deleted_at: null,
-      },
-      data: { is_default: false },
-    });
-
-    return prisma.document_templates.update({
-      where: { id },
-      data: {
-        is_default: true,
-        updated_at: new Date(),
       },
     });
   },
@@ -622,13 +558,6 @@ export const templateService = {
 
     if (template.is_system) {
       throw new AppError('Cannot delete system preset template', 403);
-    }
-
-    if (template.is_default) {
-      throw new AppError(
-        'Cannot delete default template. Set another template as default first.',
-        400
-      );
     }
 
     return prisma.document_templates.update({
@@ -644,13 +573,28 @@ export const templateService = {
    * Get default template for a document type
    */
   async getDefaultTemplate(companyId: number, documentType: document_template_type) {
-    return prisma.document_templates.findFirst({
+    // First try company's template
+    const companyTemplate = await prisma.document_templates.findFirst({
       where: {
         company_id: companyId,
         document_type: documentType,
-        is_default: true,
         deleted_at: null,
       },
+    });
+
+    if (companyTemplate) {
+      return companyTemplate;
+    }
+
+    // Fallback to system preset
+    return prisma.document_templates.findFirst({
+      where: {
+        is_system: true,
+        document_type: documentType,
+        status: document_template_status.published,
+        deleted_at: null,
+      },
+      orderBy: { created_at: 'asc' },
     });
   },
 };

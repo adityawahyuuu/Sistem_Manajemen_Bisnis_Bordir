@@ -22,6 +22,7 @@ model companies {
   phone              String?                 @db.VarChar(50)
   postal_code        String?                 @db.VarChar(20)
   province           String?                 @db.VarChar(100)
+  logo_url           String?                 @db.VarChar(500)
   users              users                   @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "fk_companies_user_id")
   cash_accounts      company_cash_accounts[]
   company_modules    company_modules[]
@@ -31,6 +32,7 @@ model companies {
   invoices           invoices[]
   items              items[]
   receipts           receipts[]
+  template_photos    template_photos[]
   waybills           waybills[]
 
   @@index([user_id], map: "fk_companies_user_id")
@@ -354,7 +356,7 @@ model document_templates {
   companies       companies?                   @relation(fields: [company_id], references: [id], onDelete: Cascade, map: "fk_templates_company")
   created_by_user users?                       @relation("template_created_by", fields: [created_by], references: [id], map: "fk_templates_created_by")
 
-  @@unique([company_id, name, document_type], map: "unique_template_name_per_company")
+  @@unique([company_id, document_type, deleted_at], map: "unique_template_type_per_company_active")
   @@index([company_id], map: "idx_templates_company")
   @@index([document_type], map: "idx_templates_type")
   @@index([status], map: "idx_templates_status")
@@ -405,4 +407,21 @@ enum document_template_type {
 enum document_template_status {
   draft
   published
+}
+
+model template_photos {
+  id           Int       @id @default(autoincrement())
+  company_id   Int
+  filename     String    @db.VarChar(255)
+  original_name String   @db.VarChar(255)
+  file_path    String    @db.VarChar(500)
+  file_url     String    @db.VarChar(500)
+  mime_type    String    @db.VarChar(100)
+  file_size    Int
+  uploaded_by  Int
+  created_at   DateTime? @default(now()) @db.Timestamp(0)
+  deleted_at   DateTime? @db.Timestamp(0)
+  companies    companies @relation(fields: [company_id], references: [id], onDelete: Cascade, map: "fk_template_photos_company")
+
+  @@index([company_id], map: "idx_template_photos_company")
 }

@@ -18,6 +18,7 @@ npm-debug.log*
 # Storage
 storage/generated/
 storage/whatsapp/
+storage/uploads/
 
 # IDE
 .vscode/

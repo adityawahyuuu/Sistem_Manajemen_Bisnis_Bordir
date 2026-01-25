@@ -167,14 +167,12 @@ export interface CreateTemplateDto {
   description?: string;
   document_type: document_template_type;
   template_schema: TemplateSchema;
-  is_default?: boolean;
 }
 
 export interface UpdateTemplateDto {
   name?: string;
   description?: string;
   template_schema?: TemplateSchema;
-  is_default?: boolean;
 }
 
 export interface AutosaveTemplateDto {

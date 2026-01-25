@@ -18,11 +18,26 @@ export const templateController = {
    */
   async findAllPresets(req: Request, res: Response, next: NextFunction) {
     try {
-      const documentType = req.query.document_type as document_template_type | undefined;
-
-      const templates = await templateService.findAllPresets(documentType);
+      const templates = await templateService.findAllPresets();
 
       sendSuccessWithDates(res, templates, 'System preset templates retrieved');
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Get default preset templates (one per document type)
+   * GET /templates/presets/defaults
+   */
+  async findDefaultPresets(req: Request, res: Response, next: NextFunction) {
+    try {
+      const companyId = parseInt(req.params.companyId);
+      const userId = parseInt(req.user!.id);
+      
+      const templates = await templateService.findDefaultPresets(companyId, userId);
+
+      sendSuccessWithDates(res, templates, 'Default preset templates retrieved');
     } catch (error) {
       next(error);
     }
@@ -218,8 +233,8 @@ export const templateController = {
   },
 
   /**
-   * Clone a template
-   * POST /templates/company/:companyId/:id/clone
+   * Clone a template (from preset or existing)
+   * POST /templates/:companyId/:id/clone
    */
   async clone(req: Request, res: Response, next: NextFunction) {
     try {
@@ -265,24 +280,6 @@ export const templateController = {
       );
 
       sendCreatedWithDates(res, template, 'Preset template cloned successfully');
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  /**
-   * Set template as default
-   * PATCH /templates/company/:companyId/:id/set-default
-   */
-  async setAsDefault(req: Request, res: Response, next: NextFunction) {
-    try {
-      const id = parseInt(req.params.id);
-      const companyId = parseInt(req.params.companyId);
-      const userId = parseInt(req.user!.id);
-
-      const template = await templateService.setAsDefault(id, companyId, userId);
-
-      sendSuccessWithDates(res, template, 'Template set as default');
     } catch (error) {
       next(error);
     }

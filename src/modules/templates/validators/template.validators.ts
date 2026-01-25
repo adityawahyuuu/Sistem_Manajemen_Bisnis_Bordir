@@ -210,7 +210,6 @@ export const createTemplateSchema = Joi.object({
   template_schema: templateSchemaValidator.required().messages({
     'any.required': 'Template schema is required',
   }),
-  is_default: Joi.boolean().optional().default(false),
 });
 
 export const updateTemplateSchema = Joi.object({
@@ -220,7 +219,6 @@ export const updateTemplateSchema = Joi.object({
   }),
   description: Joi.string().max(1000).allow('', null).optional(),
   template_schema: templateSchemaValidator.optional(),
-  is_default: Joi.boolean().optional(),
 }).min(1).messages({
   'object.min': 'At least one field is required for update',
 });

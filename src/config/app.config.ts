@@ -19,6 +19,15 @@ export const storageConfig = {
   templatesPath: process.env.TEMPLATES_PATH || './storage/templates',
   generatedPath: process.env.GENERATED_PATH || './storage/generated',
   whatsappPath: process.env.WHATSAPP_PATH || './storage/whatsapp',
+  uploadsPath: process.env.UPLOADS_PATH || './storage/uploads',
+  companyLogosPath: process.env.COMPANY_LOGOS_PATH || './storage/uploads/logos',
+  templatePhotosPath: process.env.TEMPLATE_PHOTOS_PATH || './storage/uploads/template-photos',
+};
+
+export const uploadConfig = {
+  maxFileSize: parseInt(process.env.MAX_FILE_SIZE || '5242880', 10), // 5MB
+  allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+  allowedExtensions: ['.jpg', '.jpeg', '.png', '.gif', '.webp'],
 };
 
 export const logConfig = {

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { templateController } from './controllers/template.controller';
+import { templatePhotoController } from './controllers/template-photo.controller';
 import { validate, authMiddleware } from '../../middleware';
 import {
   createTemplateSchema,
@@ -12,6 +13,7 @@ import {
   templateQuerySchema,
   templateWithCompanyParamsSchema,
 } from './validators/template.validators';
+import { uploadTemplatePhoto } from '../../shared/utils/upload.util';
 
 const router = Router();
 
@@ -43,9 +45,34 @@ router.get('/presets', templateController.findAllPresets);
 
 /**
  * @swagger
+ * /templates/presets/{companyId}/defaults:
+ *   get:
+ *     summary: Get company templates (one per document type) - returns company's template or null
+ *     tags: [Templates]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: companyId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Company ID
+ *     responses:
+ *       200:
+ *         description: Company templates retrieved (one for invoice, receipt, waybill if exists)
+ */
+router.get('/presets/:companyId/defaults',
+  validate(companyIdParamSchema, 'params'),
+  templateController.findDefaultPresets
+);
+
+/**
+ * @swagger
  * /templates/presets/{id}/clone:
  *   post:
  *     summary: Clone a system preset template to your company
+ *     description: Clone a system preset to company. Returns 409 if company already has a template for that document_type.
  *     tags: [Templates]
  *     security:
  *       - bearerAuth: []
@@ -75,6 +102,8 @@ router.get('/presets', templateController.findAllPresets);
  *     responses:
  *       201:
  *         description: Template cloned successfully
+ *       409:
+ *         description: Company already has a template for this document_type
  */
 router.post(
   '/presets/:id/clone',
@@ -83,13 +112,185 @@ router.post(
   templateController.clonePreset
 );
 
+// ============ Template Photo Routes ============
+// NOTE: Photo routes must come before company template routes to avoid route conflicts
+
+/**
+ * @swagger
+ * /templates/photos/{companyId}:
+ *   get:
+ *     summary: Get all template photos for a company
+ *     tags: [Template Photos]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: companyId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Company ID
+ *     responses:
+ *       200:
+ *         description: Template photos retrieved
+ */
+router.get(
+  '/photos/:companyId',
+  validate(companyIdParamSchema, 'params'),
+  templatePhotoController.findAll
+);
+
+/**
+ * @swagger
+ * /templates/photos/{companyId}/{id}:
+ *   get:
+ *     summary: Get template photo by ID
+ *     tags: [Template Photos]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: companyId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Template photo retrieved
+ */
+router.get(
+  '/photos/:companyId/:id',
+  validate(templateWithCompanyParamsSchema, 'params'),
+  templatePhotoController.findById
+);
+
+/**
+ * @swagger
+ * /templates/photos/{companyId}:
+ *   post:
+ *     summary: Upload a single template photo
+ *     tags: [Template Photos]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: companyId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Company ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - photo
+ *             properties:
+ *               photo:
+ *                 type: string
+ *                 format: binary
+ *                 description: Image file (jpg, png, gif, webp - max 5MB)
+ *     responses:
+ *       201:
+ *         description: Photo uploaded successfully
+ *       400:
+ *         description: Invalid file or no file uploaded
+ */
+router.post(
+  '/photos/:companyId',
+  validate(companyIdParamSchema, 'params'),
+  uploadTemplatePhoto.single('photo'),
+  templatePhotoController.upload
+);
+
+/**
+ * @swagger
+ * /templates/photos/{companyId}/multiple:
+ *   post:
+ *     summary: Upload multiple template photos
+ *     tags: [Template Photos]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: companyId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Company ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - photos
+ *             properties:
+ *               photos:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *                 description: Image files (jpg, png, gif, webp - max 5MB each, max 10 files)
+ *     responses:
+ *       201:
+ *         description: Photos uploaded successfully
+ *       400:
+ *         description: Invalid files or no files uploaded
+ */
+router.post(
+  '/photos/:companyId/multiple',
+  validate(companyIdParamSchema, 'params'),
+  uploadTemplatePhoto.array('photos', 10),
+  templatePhotoController.uploadMultiple
+);
+
+/**
+ * @swagger
+ * /templates/photos/{companyId}/{id}:
+ *   delete:
+ *     summary: Delete a template photo
+ *     tags: [Template Photos]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: companyId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Photo deleted successfully
+ *       404:
+ *         description: Photo not found
+ */
+router.delete(
+  '/photos/:companyId/:id',
+  validate(templateWithCompanyParamsSchema, 'params'),
+  templatePhotoController.delete
+);
+
 // ============ Company Template Routes ============
 
 /**
  * @swagger
  * /templates/{companyId}:
  *   get:
- *     summary: Get all templates for a company
+ *     summary: Get all templates for a company (max 3 - one per document type)
  *     tags: [Templates]
  *     security:
  *       - bearerAuth: []
@@ -100,16 +301,6 @@ router.post(
  *         schema:
  *           type: integer
  *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *       - in: query
  *         name: document_type
  *         schema:
  *           type: string
@@ -119,13 +310,9 @@ router.post(
  *         schema:
  *           type: string
  *           enum: [draft, published]
- *       - in: query
- *         name: search
- *         schema:
- *           type: string
  *     responses:
  *       200:
- *         description: Templates retrieved
+ *         description: Templates retrieved (max 3 templates - one per document type)
  */
 router.get(
   '/:companyId',
@@ -138,7 +325,8 @@ router.get(
  * @swagger
  * /templates/{companyId}:
  *   post:
- *     summary: Create a new template
+ *     summary: Create a new template (one per document type only)
+ *     description: Each company can only have ONE template per document_type. Returns 409 if template for that document_type already exists.
  *     tags: [Templates]
  *     security:
  *       - bearerAuth: []
@@ -157,6 +345,8 @@ router.get(
  *     responses:
  *       201:
  *         description: Template created
+ *       409:
+ *         description: Template for this document_type already exists
  */
 router.post(
   '/:companyId',
@@ -427,13 +617,14 @@ router.post(
   templateController.revertToVersion
 );
 
-// ============ Clone & Default Routes ============
+// ============ Clone Routes ============
 
 /**
  * @swagger
  * /templates/{companyId}/{id}/clone:
  *   post:
- *     summary: Clone a template
+ *     summary: Clone a template (from preset or existing)
+ *     description: Clone a template to company. Returns 409 if company already has a template for that document_type (not deleted).
  *     tags: [Templates]
  *     security:
  *       - bearerAuth: []
@@ -448,6 +639,7 @@ router.post(
  *         required: true
  *         schema:
  *           type: integer
+ *         description: Source template ID (preset or existing template)
  *     requestBody:
  *       required: true
  *       content:
@@ -463,42 +655,15 @@ router.post(
  *                 type: string
  *     responses:
  *       201:
- *         description: Template cloned
+ *         description: Template cloned successfully
+ *       409:
+ *         description: Company already has a template for this document_type
  */
 router.post(
   '/:companyId/:id/clone',
   validate(templateWithCompanyParamsSchema, 'params'),
   validate(cloneTemplateSchema, 'body'),
   templateController.clone
-);
-
-/**
- * @swagger
- * /templates/{companyId}/{id}/set-default:
- *   patch:
- *     summary: Set template as default for its document type
- *     tags: [Templates]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: companyId
- *         required: true
- *         schema:
- *           type: integer
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Template set as default
- */
-router.patch(
-  '/:companyId/:id/set-default',
-  validate(templateWithCompanyParamsSchema, 'params'),
-  templateController.setAsDefault
 );
 
 export default router;

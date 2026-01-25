@@ -13,6 +13,7 @@ import {
   createCashAccountSchema,
   updateCashAccountSchema,
 } from './validators/cash-account.validators';
+import { uploadLogo } from '../../shared/utils/upload.util';
 
 const router = Router();
 
@@ -232,6 +233,119 @@ router.put('/:id', validate(companyIdSchema, 'params'), validate(updateCompanySc
  *         description: Company not found
  */
 router.delete('/:id', validate(companyIdSchema, 'params'), companyController.deleteCompany);
+
+// Company Logo Routes
+/**
+ * @swagger
+ * /companies/{id}/logo:
+ *   post:
+ *     summary: Upload company logo
+ *     tags: [Companies]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Company ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - logo
+ *             properties:
+ *               logo:
+ *                 type: string
+ *                 format: binary
+ *                 description: Image file (jpg, png, gif, webp - max 5MB)
+ *     responses:
+ *       200:
+ *         description: Logo uploaded successfully
+ *       400:
+ *         description: Invalid file or no file uploaded
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Company not found
+ */
+router.post(
+  '/:id/logo',
+  validate(companyIdSchema, 'params'),
+  uploadLogo.single('logo'),
+  companyController.uploadLogo
+);
+
+/**
+ * @swagger
+ * /companies/{id}/logo:
+ *   get:
+ *     summary: Get company logo
+ *     tags: [Companies]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Company ID
+ *     responses:
+ *       200:
+ *         description: Company logo image
+ *         content:
+ *           image/png:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *           image/jpeg:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *           image/webp:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Company or logo not found
+ */
+router.get(
+  '/:id/logo',
+  validate(companyIdSchema, 'params'),
+  companyController.getLogo
+);
+
+/**
+ * @swagger
+ * /companies/{id}/logo:
+ *   delete:
+ *     summary: Delete company logo
+ *     tags: [Companies]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Company ID
+ *     responses:
+ *       200:
+ *         description: Logo deleted successfully
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Company not found or logo not found
+ */
+router.delete('/:id/logo', validate(companyIdSchema, 'params'), companyController.deleteLogo);
 
 // Company Settings Routes
 /**

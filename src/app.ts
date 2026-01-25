@@ -2,8 +2,9 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import path from 'path';
 import swaggerUi from 'swagger-ui-express';
-import { appConfig, generateSwaggerSpec } from './config';
+import { appConfig, generateSwaggerSpec, storageConfig } from './config';
 import routes from './routes';
 import { errorHandler, notFoundHandler, generalLimiter } from './middleware';
 import { logger } from './shared/utils/logger.util';
@@ -55,6 +56,9 @@ app.get('/api-docs.json', async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.send(swaggerSpec);
 });
+
+// Static file serving for uploads
+app.use('/uploads', express.static(path.resolve(storageConfig.uploadsPath)));
 
 // API routes
 app.use(appConfig.apiPrefix, routes);
