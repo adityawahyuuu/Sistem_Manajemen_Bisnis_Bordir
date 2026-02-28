@@ -1,9 +1,12 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import { prisma } from '../../../database/prisma.client';
 import { CreateReceiptDto, UpdateReceiptDto } from '../interfaces/receipt.interface';
 import { AppError } from '../../../middleware';
 import { documentGenerator } from '../../../shared/utils/document.generator.util';
-import { receipts_payment_method } from '../../../../prisma/generated/prisma';
-import { TemplateSchema } from '@/modules/templates/interfaces/template.interface';
+import { receipts_payment_method, receipts_status } from '../../../../prisma/generated/prisma';
+import { getDefaultReceiptTemplate } from '../../../shared/utils/html-builder.util';
+import { storageConfig } from '../../../config/app.config';
 
 export const receiptService = {
   async findAllByCompany(
@@ -14,6 +17,7 @@ export const receiptService = {
     customerId?: number,
     invoiceId?: number,
     paymentMethod?: receipts_payment_method,
+    status?: receipts_status,
     search?: string
   ) {
     const company = await prisma.companies.findFirst({
@@ -29,6 +33,7 @@ export const receiptService = {
       ...(customerId && { customer_id: customerId }),
       ...(invoiceId && { invoice_id: invoiceId }),
       ...(paymentMethod && { payment_method: paymentMethod }),
+      ...(status && { status }),
       ...(search && {
         OR: [
           { receipt_number: { contains: search } },
@@ -97,33 +102,46 @@ export const receiptService = {
       throw new AppError('Customer not found', 404);
     }
 
-    if (data.invoice_id) {
-      const invoice = await prisma.invoices.findFirst({
-        where: { id: data.invoice_id, company_id: companyId },
-      });
-      if (!invoice) {
-        throw new AppError('Invoice not found', 404);
-      }
+    const invoice = await prisma.invoices.findFirst({
+      where: { id: data.invoice_id, company_id: companyId },
+    });
+    if (!invoice) {
+      throw new AppError('Invoice not found', 404);
     }
 
-    const receiptNumber = await this.generateReceiptNumber(companyId);
+    const receiptNumber = await this.generateReceiptNumber(companyId, company.company_settings);
 
-    const receipt = await prisma.receipts.create({
-      data: {
-        company_id: companyId,
-        customer_id: data.customer_id,
-        invoice_id: data.invoice_id || null,
-        receipt_number: receiptNumber,
-        receipt_date: data.receipt_date ? new Date(data.receipt_date) : new Date(),
-        amount: data.amount,
-        payment_method: data.payment_method || 'cash',
-        description: data.description || null,
-        received_by: data.received_by || null,
-        notes: data.notes || null,
-        created_by: userId,
-      },
-      include: { customers: true, invoices: true },
-    });
+    const receiptBaseData = {
+      company_id: companyId,
+      customer_id: data.customer_id,
+      invoice_id: data.invoice_id,
+      receipt_date: data.receipt_date ? new Date(data.receipt_date) : new Date(),
+      amount: data.amount,
+      payment_method: (data.payment_method || 'cash') as receipts_payment_method,
+      status: (data.status || 'dp') as receipts_status,
+      description: data.description || null,
+      received_by: data.received_by || null,
+      notes: data.notes || null,
+      created_by: userId,
+    };
+
+    const doCreate = (number: string) =>
+      prisma.receipts.create({
+        data: { ...receiptBaseData, receipt_number: number },
+        include: { customers: true, invoices: true },
+      });
+
+    let receipt;
+    try {
+      receipt = await doCreate(receiptNumber);
+    } catch (err: any) {
+      if (err?.code === 'P2002') {
+        const retryNumber = await this.generateReceiptNumber(companyId, company.company_settings);
+        receipt = await doCreate(retryNumber);
+      } else {
+        throw err;
+      }
+    }
 
     return receipt;
   },
@@ -150,6 +168,7 @@ export const receiptService = {
       data: {
         amount: data.amount,
         payment_method: data.payment_method as receipts_payment_method,
+        status: data.status as receipts_status,
         description: data.description,
         received_by: data.received_by,
         notes: data.notes,
@@ -190,99 +209,40 @@ export const receiptService = {
   async generate(
     id: number,
     companyId: number,
-    userId: number,
-    templateId?: number
+    userId: number
   ) {
     const receipt = await this.findById(id, companyId, userId);
 
-    let template;
+    const template = getDefaultReceiptTemplate();
 
-    if (templateId) {
-      // Find specific template by ID
-      template = await prisma.document_templates.findFirst({
-        where: {
-          id: templateId,
-          document_type: 'receipt',
-          deleted_at: null,
-          OR: [{ company_id: companyId }, { is_system: true }],
-        },
-      });
-
-      if (!template) {
-        throw new AppError('Template not found', 404);
-      }
-
-      if (template.status !== 'published') {
-        throw new AppError('Template must be published before use. Please publish the template first.', 400);
-      }
-    } else {
-      // Find default template for company, or fallback to system template
-      template = await prisma.document_templates.findFirst({
-        where: {
-          document_type: 'receipt',
-          status: 'published',
-          deleted_at: null,
-          OR: [
-            { company_id: companyId, is_default: true },
-            { is_system: true },
-          ],
-        },
-        orderBy: [
-          { company_id: 'desc' },
-          { is_default: 'desc' },
-        ],
-      });
-
-      if (!template) {
-        throw new AppError('No published template available. Please create and publish a template first.', 404);
-      }
-    }
-
-    // 2. Backend hanya mapping data (tanpa layout)
     const documentData = {
-      company: {
-        name: receipt.companies?.name,
-        address: [
-          receipt.companies?.address,
-          receipt.companies?.city,
-          receipt.companies?.province,
-        ]
-          .filter(Boolean)
-          .join(', '),
-        phone: receipt.companies?.phone,
-        theme: {
-          primary_color:
-            receipt.companies?.company_settings?.primary_color ?? '#333333',
-        },
-      },
-
-      document: {
-        number: receipt.receipt_number,
-        date: receipt.receipt_date,
-      },
-
-      customer: {
-        name: receipt.customers?.name,
-      },
-
-      payment: {
-        amount: Number(receipt.amount),
-        method: receipt.payment_method,
-        invoice_number: receipt.invoices?.invoice_number ?? undefined,
-        description: receipt.description ?? undefined,
-        received_by: receipt.received_by,
-      },
-
+      company_name: receipt.companies?.name ?? '',
+      company_address: [
+        receipt.companies?.address,
+        receipt.companies?.city,
+        receipt.companies?.province,
+      ].filter(Boolean).join(', '),
+      company_phone: receipt.companies?.phone ?? '',
+      company_email: receipt.companies?.email ?? '',
+      company_logo: this.resolveLogoToBase64(receipt.companies?.logo_url),
+      document_number: receipt.receipt_number,
+      date: receipt.receipt_date?.toISOString(),
+      customer_name: receipt.customers?.name ?? '',
+      customer_company: receipt.customers?.company_name ?? '',
+      customer_address: [
+        receipt.customers?.address,
+        receipt.customers?.city_code,
+        receipt.customers?.province_code,
+      ].filter(Boolean).join(', '),
+      customer_phone: receipt.customers?.phone ?? '',
+      amount: Number(receipt.amount),
+      payment_method: receipt.payment_method,
+      description: receipt.description ?? undefined,
+      received_by: receipt.received_by ?? undefined,
       notes: receipt.notes ?? undefined,
     };
 
-    // 3. Render HTML via schema-driven engine
-    const templateSchema = template.template_schema as unknown as TemplateSchema;
-
-    const htmlContent = documentGenerator.generateFromTemplate(
-      templateSchema,
-      documentData
-    );
+    const htmlContent = documentGenerator.generateFromTemplate(template, documentData);
 
     // 4. Generate PDF
     const fileName = `receipt-${receipt.receipt_number.replace(/[/\\]/g, '-')}.pdf`;
@@ -317,22 +277,46 @@ export const receiptService = {
     return documentGenerator.getFilePath(receipt.generated_file_path);
   },
 
-  async generateReceiptNumber(companyId: number) {
+  async generateReceiptNumber(
+    companyId: number,
+    settings?: { invoice_prefix?: string | null } | null
+  ) {
+    const MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+    const prefix = settings?.invoice_prefix || 'AAJ';
     const now = new Date();
     const year = now.getFullYear().toString();
-    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const monthAbbr = MONTHS[now.getMonth()];
 
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const pattern = `KUITANSI/${prefix}/${monthAbbr}/${year}/`;
 
-    const count = await prisma.receipts.count({
-      where: {
-        company_id: companyId,
-        created_at: { gte: startOfMonth, lte: endOfMonth },
-      },
+    const last = await prisma.receipts.findFirst({
+      where: { company_id: companyId, receipt_number: { startsWith: pattern } },
+      orderBy: { id: 'desc' },
+      select: { receipt_number: true },
     });
 
-    const number = (count + 1).toString().padStart(4, '0');
-    return `RCP-${year}${month}-${number}`;
+    let nextSeq = 1;
+    if (last) {
+      const parts = last.receipt_number.split('/');
+      const seq = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(seq)) nextSeq = seq + 1;
+    }
+
+    return `${pattern}${nextSeq.toString().padStart(4, '0')}`;
+  },
+
+  resolveLogoToBase64(logoUrl?: string | null): string | undefined {
+    if (!logoUrl) return undefined;
+
+    const fileName = logoUrl.split('/').pop();
+    if (!fileName) return undefined;
+
+    const logoPath = path.join(storageConfig.companyLogosPath, fileName);
+    if (!fs.existsSync(logoPath)) return undefined;
+
+    const buffer = fs.readFileSync(logoPath);
+    const ext = path.extname(fileName).toLowerCase().replace('.', '');
+    const mime = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`;
+    return `data:${mime};base64,${buffer.toString('base64')}`;
   },
 };

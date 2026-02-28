@@ -30,11 +30,23 @@ export const customerService = {
         skip: (page - 1) * limit,
         take: limit,
         orderBy: { created_at: 'desc' },
+        include: {
+          invoices: {
+            where: { status: { not: 'cancelled' } },
+            select: { total_amount: true, total_paid: true },
+          },
+        },
       }),
       prisma.customers.count({ where }),
     ]);
 
-    return { data: customers, total };
+    const data = customers.map(({ invoices, ...c }) => ({
+      ...c,
+      piutang: invoices.reduce((sum, inv) => sum + Math.max(0, Number(inv.total_amount) - Number(inv.total_paid)), 0),
+      overpay: invoices.reduce((sum, inv) => sum + Math.max(0, Number(inv.total_paid) - Number(inv.total_amount)), 0),
+    }));
+
+    return { data, total };
   },
 
   async findById(id: number, companyId: number, userId: number) {
@@ -51,9 +63,11 @@ export const customerService = {
       where: { id, company_id: companyId },
       include: {
         customer_items: {
-          include: {
-            items: true,
-          },
+          include: { items: true },
+        },
+        invoices: {
+          where: { status: { not: 'cancelled' } },
+          select: { total_amount: true, total_paid: true },
         },
       },
     });
@@ -62,7 +76,12 @@ export const customerService = {
       throw new AppError('Customer not found', 404);
     }
 
-    return customer;
+    const { invoices, ...rest } = customer;
+    return {
+      ...rest,
+      piutang: invoices.reduce((sum, inv) => sum + Math.max(0, Number(inv.total_amount) - Number(inv.total_paid)), 0),
+      overpay: invoices.reduce((sum, inv) => sum + Math.max(0, Number(inv.total_paid) - Number(inv.total_amount)), 0),
+    };
   },
 
   async create(companyId: number, userId: number, data: CreateCustomerDto) {
@@ -82,10 +101,12 @@ export const customerService = {
         company_name: data.company_name,
         email: data.email,
         phone: data.phone,
-        whatsapp_numbers: data.whatsapp_numbers || [],
+        mobile_phone: data.mobile_phone,
         address: data.address,
-        city: data.city || 'Tasikmalaya',
-        province: data.province || 'Jawa Barat',
+        province_code: data.province_code,
+        city_code: data.city_code,
+        subdistrict_code: data.subdistrict_code,
+        village_code: data.village_code,
         postal_code: data.postal_code,
       },
     });
@@ -119,10 +140,12 @@ export const customerService = {
         company_name: data.company_name,
         email: data.email,
         phone: data.phone,
-        whatsapp_numbers: data.whatsapp_numbers,
+        mobile_phone: data.mobile_phone,
         address: data.address,
-        city: data.city,
-        province: data.province,
+        province_code: data.province_code,
+        city_code: data.city_code,
+        subdistrict_code: data.subdistrict_code,
+        village_code: data.village_code,
         postal_code: data.postal_code,
       },
     });

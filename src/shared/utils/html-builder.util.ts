@@ -1,14 +1,86 @@
-import {
-  TemplateSchema,
-  HeaderSettings,
-  RecipientSettings,
-  TableSettings,
-  TableColumn,
-  SummarySettings,
-  SummaryField,
-  SignatureSettings,
-  FooterSettings,
-} from '../../modules/templates/interfaces/template.interface';
+export interface TableColumn {
+  id: string;
+  field: string;
+  header: string;
+  width?: string;
+  align: string;
+  format: string;
+  visible: boolean;
+}
+
+export interface SummaryField {
+  id: string;
+  field: string;
+  label: string;
+  format: string;
+  visible: boolean;
+  isGrandTotal?: boolean;
+  condition?: { field: string; operator: string; value?: unknown };
+}
+
+interface SignatureColumn {
+  id: string;
+  title: string;
+  enabled: boolean;
+}
+
+interface HeaderSettings {
+  enabled: boolean;
+  layout: 'left-right' | 'centered' | 'stacked';
+  logo: { enabled: boolean; position: string; maxHeight: number; maxWidth: number };
+  companyInfo: { enabled: boolean; showName: boolean; showAddress: boolean; showPhone: boolean; showEmail: boolean };
+  documentInfo: { enabled: boolean; showTitle: boolean; titleText?: string; showNumber: boolean; showDate: boolean; showDueDate: boolean; showStatus: boolean; fontSize?: string; fontWeight?: string };
+  customText?: string;
+}
+
+interface RecipientSettings {
+  enabled: boolean;
+  title: string;
+  showName: boolean;
+  showCompanyName: boolean;
+  showAddress: boolean;
+  showPhone: boolean;
+  showEmail: boolean;
+}
+
+interface TableSettings {
+  enabled: boolean;
+  showHeader: boolean;
+  headerStyle?: { backgroundColor: string; textColor: string; fontWeight: string };
+  rowStyle?: { alternateColors: boolean; borderBottom: boolean; alternateColor?: string };
+  columns: TableColumn[];
+}
+
+interface SummarySettings {
+  enabled: boolean;
+  position: 'left' | 'right' | 'full-width';
+  fields: SummaryField[];
+}
+
+interface SignatureSettings {
+  enabled: boolean;
+  columns: SignatureColumn[];
+}
+
+interface FooterSettings {
+  enabled: boolean;
+  text?: string;
+  showPageNumber?: boolean;
+}
+
+export interface TemplateSchema {
+  schemaVersion: string;
+  page: { size: string; orientation: string; margins: { top: number; right: number; bottom: number; left: number } };
+  styles: { primaryColor?: string; secondaryColor?: string; fontFamily?: string; fontSize?: number; lineHeight?: number };
+  header: HeaderSettings;
+  recipient: RecipientSettings;
+  table: TableSettings;
+  summary: SummarySettings;
+  notes: { enabled: boolean; title: string; showIfEmpty: boolean };
+  terms: { enabled: boolean; title: string; showIfEmpty: boolean };
+  signature: SignatureSettings;
+  footer: FooterSettings;
+}
 
 export interface DocumentData {
   // Company info
@@ -40,8 +112,19 @@ export interface DocumentData {
   // Totals
   subtotal?: number;
   discount?: number;
+  shipping?: number;
   tax?: number;
   total?: number;
+
+  // Invoice extras
+  po_number?: string;
+  payment_history?: Array<{
+    receipt_number: string;
+    date: Date | string;
+    amount: number;
+    payment_method: string;
+    status: string;
+  }>;
 
   // Content
   notes?: string;
@@ -68,6 +151,16 @@ class HtmlBuilder {
   constructor(template: TemplateSchema, data: DocumentData) {
     this.template = template;
     this.data = data;
+  }
+
+  /**
+   * Format date string for display
+   */
+  private formatDate(value?: string | Date): string {
+    if (!value) return '-';
+    const d = typeof value === 'string' ? new Date(value) : value;
+    if (isNaN(d.getTime())) return String(value);
+    return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
   }
 
   /**
@@ -129,6 +222,14 @@ class HtmlBuilder {
         border-bottom: 2px solid ${primaryColor};
         padding-bottom: 20px;
       }
+      .header-centered .company-info {
+        margin-top: 8px;
+      }
+      .header-centered .company-info h2 {
+        font-size: ${fontSize}px;
+        font-weight: normal;
+        color: ${secondaryColor};
+      }
       .header-stacked {
         margin-bottom: 30px;
         border-bottom: 2px solid ${primaryColor};
@@ -146,7 +247,6 @@ class HtmlBuilder {
       .document-title h1 {
         margin: 0;
         color: ${primaryColor};
-        font-size: 28px;
       }
       .document-title p {
         margin: 5px 0;
@@ -278,6 +378,30 @@ class HtmlBuilder {
       .status-paid { background: #4caf50; }
       .status-cancelled { background: #f44336; }
       .status-default { background: #ff9800; }
+      .payment-history {
+        margin-top: 25px;
+        padding: 15px;
+        background: #f9f9f9;
+        border-radius: 5px;
+      }
+      .payment-history h4 {
+        margin: 0 0 12px 0;
+        color: #555;
+        font-size: ${fontSize}px;
+      }
+      .payment-history table {
+        margin-bottom: 0;
+      }
+      .payment-history th {
+        background-color: #555;
+        font-size: ${fontSize - 2}px;
+        padding: 7px 10px;
+      }
+      .payment-history td {
+        font-size: ${fontSize - 1}px;
+        padding: 6px 10px;
+        border-bottom: 1px solid #eee;
+      }
       .amount-display {
         text-align: center;
         margin: 30px 0;
@@ -315,6 +439,10 @@ class HtmlBuilder {
       parts.push(this.buildSummary(this.template.summary));
     }
 
+    if (this.data.payment_history && this.data.payment_history.length > 0) {
+      parts.push(this.buildPaymentHistory());
+    }
+
     if (this.template.notes.enabled && (this.data.notes || this.template.notes.showIfEmpty)) {
       parts.push(this.buildNotes());
     }
@@ -335,60 +463,80 @@ class HtmlBuilder {
   }
 
   /**
+   * Build logo HTML
+   */
+  private buildLogoHtml(logo: HeaderSettings['logo']): string {
+    if (!logo.enabled || !this.data.company_logo) return '';
+    return `<img src="${this.data.company_logo}" alt="Logo" style="max-height: ${logo.maxHeight}px; max-width: ${logo.maxWidth}px; margin-bottom: 10px;" />`;
+  }
+
+  /**
+   * Build company info HTML (without logo)
+   */
+  private buildCompanyInfoHtml(companyInfo: HeaderSettings['companyInfo']): string {
+    if (!companyInfo.enabled) return '';
+
+    const contactParts: string[] = [];
+    if (companyInfo.showPhone && this.data.company_phone) contactParts.push(`Tel: ${this.data.company_phone}`);
+    if (companyInfo.showEmail && this.data.company_email) contactParts.push(this.data.company_email);
+
+    return `
+      ${companyInfo.showName ? `<h2>${this.data.company_name || ''}</h2>` : ''}
+      ${companyInfo.showAddress && this.data.company_address ? `<p>${this.data.company_address}</p>` : ''}
+      ${contactParts.length > 0 ? `<p>${contactParts.join(' | ')}</p>` : ''}
+    `;
+  }
+
+  /**
+   * Build document info HTML
+   */
+  private buildDocumentInfoHtml(documentInfo: HeaderSettings['documentInfo']): string {
+    if (!documentInfo.enabled) return '';
+
+    const statusClass = this.data.status === 'paid' ? 'paid' : this.data.status === 'cancelled' ? 'cancelled' : 'default';
+    const titleFontSize = documentInfo.fontSize || '28px';
+    const titleFontWeight = documentInfo.fontWeight || 'bold';
+
+    return `
+      ${documentInfo.showTitle ? `<h1 style="font-size: ${titleFontSize}; font-weight: ${titleFontWeight};">${documentInfo.titleText || this.data.document_title || 'DOCUMENT'}</h1>` : ''}
+      ${documentInfo.showNumber ? `<p><strong>${this.data.document_number || ''}</strong></p>` : ''}
+      ${documentInfo.showDate ? `
+        <p class="label">Tanggal</p>
+        <p>${this.formatDate(this.data.date)}</p>
+      ` : ''}
+      ${documentInfo.showDueDate && this.data.due_date ? `
+        <p class="label">Jatuh Tempo</p>
+        <p>${this.formatDate(this.data.due_date)}</p>
+      ` : ''}
+      ${documentInfo.showStatus && this.data.status ? `
+        <span class="status-badge status-${statusClass}">${this.data.status}</span>
+      ` : ''}
+    `;
+  }
+
+  /**
    * Build header section
    */
   private buildHeader(header: HeaderSettings): string {
     const { layout, logo, companyInfo, documentInfo, customText } = header;
+    const primaryColor = this.template.styles.primaryColor || '#333333';
 
-    let logoHtml = '';
-    if (logo.enabled && this.data.company_logo) {
-      logoHtml = `<img src="${this.data.company_logo}" alt="Logo" style="max-height: ${logo.maxHeight}px; max-width: ${logo.maxWidth}px; margin-bottom: 10px;" />`;
-    }
-
-    let companyHtml = '';
-    if (companyInfo.enabled) {
-      companyHtml = `
-        <div class="company-info">
-          ${logoHtml}
-          ${companyInfo.showName ? `<h2>${this.data.company_name || ''}</h2>` : ''}
-          ${companyInfo.showAddress ? `<p>${this.data.company_address || ''}</p>` : ''}
-          <p>
-            ${companyInfo.showPhone && this.data.company_phone ? `Tel: ${this.data.company_phone}` : ''}
-            ${companyInfo.showEmail && this.data.company_email ? `| ${this.data.company_email}` : ''}
-          </p>
-        </div>
-      `;
-    }
-
-    let documentHtml = '';
-    if (documentInfo.enabled) {
-      documentHtml = `
-        <div class="document-title">
-          ${documentInfo.showTitle ? `<h1>${documentInfo.titleText || this.data.document_title || 'DOCUMENT'}</h1>` : ''}
-          ${documentInfo.showNumber ? `<p><strong>${this.data.document_number || ''}</strong></p>` : ''}
-          ${documentInfo.showDate ? `
-            <p class="label">Tanggal</p>
-            <p>${this.data.date || '-'}</p>
-          ` : ''}
-          ${documentInfo.showDueDate && this.data.due_date ? `
-            <p class="label">Jatuh Tempo</p>
-            <p>${this.data.due_date}</p>
-          ` : ''}
-          ${documentInfo.showStatus && this.data.status ? `
-            <span class="status-badge status-${this.data.status === 'paid' ? 'paid' : this.data.status === 'cancelled' ? 'cancelled' : 'default'}">${this.data.status}</span>
-          ` : ''}
-        </div>
-      `;
-    }
+    const logoHtml = this.buildLogoHtml(logo);
+    const companyInfoContent = this.buildCompanyInfoHtml(companyInfo);
+    const documentInfoContent = this.buildDocumentInfoHtml(documentInfo);
+    const customTextHtml = customText ? `<p>${customText}</p>` : '';
 
     if (layout === 'centered') {
       return `
         <div class="header-centered">
           ${logoHtml}
-          ${documentInfo.showTitle ? `<h1>${documentInfo.titleText || this.data.document_title || 'DOCUMENT'}</h1>` : ''}
-          ${documentInfo.showNumber ? `<p><strong>${this.data.document_number || ''}</strong></p>` : ''}
-          ${companyInfo.showName ? `<p>${this.data.company_name || ''}</p>` : ''}
-          ${customText ? `<p>${customText}</p>` : ''}
+          <div class="document-title">
+            ${documentInfoContent}
+          </div>
+          <div class="company-info">
+            ${companyInfoContent}
+          </div>
+          ${customTextHtml}
         </div>
       `;
     }
@@ -396,22 +544,37 @@ class HtmlBuilder {
     if (layout === 'stacked') {
       return `
         <div class="header-stacked">
-          ${logoHtml}
-          ${companyHtml}
-          <hr style="margin: 15px 0; border: none; border-top: 1px solid #eee;" />
-          ${documentHtml}
-          ${customText ? `<p>${customText}</p>` : ''}
+          <div style="text-align: ${logo.position};">
+            ${logoHtml}
+          </div>
+          <div class="company-info">
+            ${companyInfoContent}
+          </div>
+          <hr style="margin: 15px 0; border: none; border-top: 1px solid ${primaryColor}33;" />
+          <div class="document-title">
+            ${documentInfoContent}
+          </div>
+          ${customTextHtml}
         </div>
       `;
     }
 
-    // Default: left-right layout
+    // Default: left-right / split layout
+    // logo.position determines which side gets the logo
+    const leftContent = logo.position === 'right'
+      ? `<div class="document-title">${documentInfoContent}</div>`
+      : `<div class="company-info">${logoHtml}${companyInfoContent}</div>`;
+
+    const rightContent = logo.position === 'right'
+      ? `<div class="company-info" style="text-align: right;">${logoHtml}${companyInfoContent}</div>`
+      : `<div class="document-title">${documentInfoContent}</div>`;
+
     return `
       <div class="header">
-        ${companyHtml}
-        ${documentHtml}
+        ${leftContent}
+        ${rightContent}
       </div>
-      ${customText ? `<p style="text-align: center; margin-bottom: 20px;">${customText}</p>` : ''}
+      ${customTextHtml ? `<div style="text-align: center; margin-bottom: 20px;">${customTextHtml}</div>` : ''}
     `;
   }
 
@@ -544,6 +707,55 @@ class HtmlBuilder {
         <td class="label-col">${field.label}</td>
         <td class="value-col">${formattedValue}</td>
       </tr>
+    `;
+  }
+
+  /**
+   * Build payment history section (cicilan)
+   */
+  private buildPaymentHistory(): string {
+    const history = this.data.payment_history!;
+    const rows = history
+      .map(
+        (item, index) => `
+        <tr>
+          <td style="text-align: center;">${index + 1}</td>
+          <td>${item.receipt_number}</td>
+          <td style="text-align: center;">${this.formatDate(item.date)}</td>
+          <td style="text-align: right;">Rp ${Number(item.amount).toLocaleString('id-ID')}</td>
+          <td style="text-align: center;">${item.payment_method}</td>
+          <td style="text-align: center;">${item.status}</td>
+        </tr>
+      `
+      )
+      .join('');
+
+    const totalPaid = history.reduce((s, r) => s + Number(r.amount), 0);
+
+    return `
+      <div class="payment-history">
+        <h4>Riwayat Pembayaran</h4>
+        <table>
+          <thead>
+            <tr>
+              <th style="text-align: center; width: 40px;">No</th>
+              <th>No. Kuitansi</th>
+              <th style="text-align: center; width: 130px;">Tanggal</th>
+              <th style="text-align: right; width: 130px;">Jumlah</th>
+              <th style="text-align: center; width: 90px;">Metode</th>
+              <th style="text-align: center; width: 80px;">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+            <tr>
+              <td colspan="3" style="text-align: right; font-weight: bold;">Total Dibayar</td>
+              <td style="text-align: right; font-weight: bold;">Rp ${totalPaid.toLocaleString('id-ID')}</td>
+              <td colspan="2"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     `;
   }
 
@@ -681,9 +893,9 @@ export function getDefaultInvoiceTemplate(): TemplateSchema {
       rowStyle: { alternateColors: false, borderBottom: true },
       columns: [
         { id: 'no', field: 'index', header: 'No', width: '40px', align: 'center', format: 'number', visible: true },
+        { id: 'name', field: 'name', header: 'Nama Item', width: '140px', align: 'left', format: 'text', visible: true },
         { id: 'description', field: 'description', header: 'Deskripsi', align: 'left', format: 'text', visible: true },
         { id: 'quantity', field: 'quantity', header: 'Qty', width: '60px', align: 'center', format: 'number', visible: true },
-        { id: 'unit', field: 'unit', header: 'Satuan', width: '60px', align: 'center', format: 'text', visible: true },
         { id: 'unit_price', field: 'unit_price', header: 'Harga Satuan', width: '120px', align: 'right', format: 'currency', visible: true },
         { id: 'total', field: 'total', header: 'Total', width: '120px', align: 'right', format: 'currency', visible: true },
       ],
@@ -694,6 +906,7 @@ export function getDefaultInvoiceTemplate(): TemplateSchema {
       fields: [
         { id: 'subtotal', field: 'subtotal', label: 'Subtotal', format: 'currency', visible: true },
         { id: 'discount', field: 'discount', label: 'Diskon', format: 'currency', visible: true, condition: { field: 'discount', operator: 'gt', value: 0 } },
+        { id: 'shipping', field: 'shipping', label: 'Biaya Pengiriman', format: 'currency', visible: true, condition: { field: 'shipping', operator: 'gt', value: 0 } },
         { id: 'tax', field: 'tax', label: 'Pajak', format: 'currency', visible: true, condition: { field: 'tax', operator: 'gt', value: 0 } },
         { id: 'total', field: 'total', label: 'Total', format: 'currency', visible: true, isGrandTotal: true },
       ],

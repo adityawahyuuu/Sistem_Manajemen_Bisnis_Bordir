@@ -1,6 +1,8 @@
 import dotenv from 'dotenv';
+import path from 'path';
 
-dotenv.config();
+// Resolve .env from project root (works regardless of cwd)
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 export const appConfig = {
   env: process.env.NODE_ENV || 'development',

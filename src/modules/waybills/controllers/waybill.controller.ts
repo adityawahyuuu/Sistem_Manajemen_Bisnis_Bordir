@@ -94,16 +94,8 @@ export const waybillController = {
       const id = Number(req.params.id);
       const companyId = Number(req.params.companyId);
       const userId = Number(req.user!.id);
-      const templateId = req.query.templateId
-        ? Number(req.query.templateId)
-        : undefined;
 
-      const result = await waybillService.generate(
-        id,
-        companyId,
-        userId,
-        templateId
-      );
+      const result = await waybillService.generate(id, companyId, userId);
 
       sendSuccessWithDates(
         res,

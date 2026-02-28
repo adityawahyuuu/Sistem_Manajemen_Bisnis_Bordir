@@ -87,6 +87,7 @@ router.get(
  *             type: object
  *             required:
  *               - customer_id
+ *               - invoice_id
  *             properties:
  *               customer_id:
  *                 type: integer
@@ -94,7 +95,7 @@ router.get(
  *               invoice_id:
  *                 type: integer
  *                 example: 1
- *                 description: If provided, items will be copied from invoice
+ *                 description: Items will be auto-copied from invoice if not provided
  *               waybill_date:
  *                 type: string
  *                 format: date
@@ -104,6 +105,9 @@ router.get(
  *                 type: string
  *               destination_province:
  *                 type: string
+ *               expedition_name:
+ *                 type: string
+ *                 example: JNE
  *               vehicle_number:
  *                 type: string
  *                 example: B 1234 XYZ
@@ -198,6 +202,9 @@ router.get(
  *                 type: string
  *               destination_province:
  *                 type: string
+ *               expedition_name:
+ *                 type: string
+ *                 example: JNE
  *               vehicle_number:
  *                 type: string
  *               driver_name:

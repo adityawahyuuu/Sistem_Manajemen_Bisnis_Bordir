@@ -4,7 +4,6 @@ import { validate, authMiddleware, requireAdmin } from '../../middleware';
 import {
   loginSchema,
   registerSchema,
-  refreshTokenSchema,
   logoutSchema,
   createProfileSchema,
   setRoleSchema,
@@ -392,7 +391,7 @@ router.post('/reset-password', validate(resetPasswordSchema), authController.res
  *       404:
  *         description: User not found
  */
-router.post('/refresh-token', validate(refreshTokenSchema), authController.refreshToken);
+router.post('/refresh-token', authController.refreshToken);
 
 /**
  * @swagger

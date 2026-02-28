@@ -6,7 +6,7 @@ import itemRoutes from '../modules/items/items.routes';
 import invoiceRoutes from '../modules/invoices/invoice.routes';
 import waybillRoutes from '../modules/waybills/waybill.routes';
 import receiptRoutes from '../modules/receipts/receipt.routes';
-import templateRoutes from '../modules/templates/templates.routes';
+import masterRoutes from '../modules/master/master.routes';
 
 const router = Router();
 
@@ -17,6 +17,6 @@ router.use('/items', itemRoutes);
 router.use('/invoices', invoiceRoutes);
 router.use('/waybills', waybillRoutes);
 router.use('/receipts', receiptRoutes);
-router.use('/templates', templateRoutes);
+router.use('/master', masterRoutes);
 
 export default router;

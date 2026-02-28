@@ -151,9 +151,7 @@ export const companyService = {
       return null;
     }
 
-    const baseUrl = process.env.APP_URL; // contoh: https://api.domain.com
-
-    return `${baseUrl}${company.logo_url}`;
+    return company.logo_url;
   },
 
   async deleteLogo(companyId: number, userId: number) {

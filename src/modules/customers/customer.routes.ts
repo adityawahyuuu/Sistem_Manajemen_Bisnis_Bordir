@@ -90,23 +90,32 @@ router.get('/:companyId', customerController.findAll);
  *               phone:
  *                 type: string
  *                 example: '081234567890'
- *               whatsapp_numbers:
- *                 type: array
- *                 items:
- *                   type: string
- *                 example: ['081234567890']
+ *               mobile_phone:
+ *                 type: string
+ *                 example: '081234567890'
  *               address:
  *                 type: string
  *                 example: Jl. Merdeka No. 123
- *               city:
+ *               province_code:
  *                 type: string
- *                 example: Tasikmalaya
- *               province:
+ *                 example: '32'
+ *                 description: "Code dari GET /master/provinces"
+ *               city_code:
  *                 type: string
- *                 example: Jawa Barat
+ *                 example: '3278'
+ *                 description: "Code dari GET /master/cities?province_code=32"
+ *               subdistrict_code:
+ *                 type: string
+ *                 example: '3278030'
+ *                 description: "Code dari GET /master/subdistricts?city_code=3278"
+ *               village_code:
+ *                 type: string
+ *                 example: '3278030005'
+ *                 description: "Code dari GET /master/villages?subdistrict_code=3278030"
  *               postal_code:
  *                 type: string
  *                 example: '46181'
+ *                 description: "Auto-fill dari GET /master/villages/:id"
  *     responses:
  *       201:
  *         description: Customer created successfully
@@ -186,18 +195,30 @@ router.get('/:companyId/:customerId', customerController.findById);
  *                 type: string
  *               phone:
  *                 type: string
- *               whatsapp_numbers:
- *                 type: array
- *                 items:
- *                   type: string
+ *               mobile_phone:
+ *                 type: string
  *               address:
  *                 type: string
- *               city:
+ *               province_code:
  *                 type: string
- *               province:
+ *                 example: '32'
+ *                 description: "Code dari GET /master/provinces"
+ *               city_code:
  *                 type: string
+ *                 example: '3278'
+ *                 description: "Code dari GET /master/cities?province_code=32"
+ *               subdistrict_code:
+ *                 type: string
+ *                 example: '3278030'
+ *                 description: "Code dari GET /master/subdistricts?city_code=3278"
+ *               village_code:
+ *                 type: string
+ *                 example: '3278030005'
+ *                 description: "Code dari GET /master/villages?subdistrict_code=3278030"
  *               postal_code:
  *                 type: string
+ *                 example: '46181'
+ *                 description: "Auto-fill dari GET /master/villages/:id"
  *     responses:
  *       200:
  *         description: Customer updated successfully

@@ -2,13 +2,6 @@ import swaggerJsdoc from 'swagger-jsdoc';
 import { appConfig } from './app.config';
 import path from 'path';
 
-const getServerUrl = (): string => {
-  if (appConfig.env === 'production') {
-    return process.env.RENDER_EXTERNAL_URL || process.env.API_URL || 'https://your-app.onrender.com';
-  }
-  return `http://localhost:${appConfig.port}`;
-};
-
 const options: swaggerJsdoc.Options = {
   definition: {
     openapi: '3.0.0',
@@ -22,8 +15,8 @@ const options: swaggerJsdoc.Options = {
     },
     servers: [
       {
-        url: `${getServerUrl()}${appConfig.apiPrefix}`,
-        description: appConfig.env === 'production' ? 'Production server' : 'Development server',
+        url: appConfig.apiPrefix,
+        description: 'API Server (auto-detect host)',
       },
     ],
     components: {
@@ -52,10 +45,12 @@ const options: swaggerJsdoc.Options = {
             company_name: { type: 'string' },
             email: { type: 'string' },
             phone: { type: 'string' },
-            whatsapp_numbers: { type: 'array', items: { type: 'string' } },
+            mobile_phone: { type: 'string' },
             address: { type: 'string' },
-            city: { type: 'string' },
-            province: { type: 'string' },
+            province_code: { type: 'string' },
+            city_code: { type: 'string' },
+            subdistrict_code: { type: 'string' },
+            village_code: { type: 'string' },
             postal_code: { type: 'string' },
             created_at: { type: 'string', format: 'date-time' },
             updated_at: { type: 'string', format: 'date-time' },
@@ -132,7 +127,7 @@ const options: swaggerJsdoc.Options = {
         path.join(__dirname, '../modules/invoices/invoice.routes.js'),
         path.join(__dirname, '../modules/receipts/receipt.routes.js'),
         path.join(__dirname, '../modules/waybills/waybill.routes.js'),
-        path.join(__dirname, '../modules/templates/templates.routes.js'),
+        path.join(__dirname, '../modules/master/master.routes.js'),
         path.join(__dirname, '../routes/*.js')
       ]
     : [
@@ -143,7 +138,7 @@ const options: swaggerJsdoc.Options = {
         path.join(__dirname, '../modules/invoices/invoice.routes.ts'),
         path.join(__dirname, '../modules/receipts/receipt.routes.ts'),
         path.join(__dirname, '../modules/waybills/waybill.routes.ts'),
-        path.join(__dirname, '../modules/templates/templates.routes.ts'),
+        path.join(__dirname, '../modules/master/master.routes.ts'),
         path.join(__dirname, '../routes/*.ts')
       ],
 };

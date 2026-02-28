@@ -1,13 +1,6 @@
 import Joi from 'joi';
 
 export const createItemSchema = Joi.object({
-  item_code: Joi.string()
-    .max(100)
-    .required()
-    .messages({
-      'string.max': 'Item code must not exceed 100 characters',
-      'any.required': 'Item code is required',
-    }),
   item_name: Joi.string()
     .min(2)
     .max(255)
@@ -24,12 +17,10 @@ export const createItemSchema = Joi.object({
 });
 
 export const updateItemSchema = Joi.object({
-  item_code: Joi.string().max(100).optional(),
   item_name: Joi.string().min(2).max(255).optional(),
   description: Joi.string().optional().allow(null, ''),
   unit: Joi.string().max(50).optional(),
   unit_price: Joi.number().min(0).optional(),
-  is_active: Joi.boolean().optional(),
   category: Joi.string().optional().allow(null, ''),
 });
 

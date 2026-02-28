@@ -69,13 +69,13 @@ class EmailService {
     }
   }
 
-  async sendPasswordResetEmail(to: string, resetToken: string, userName: string, expiryHours: number): Promise<void> {
+  async sendPasswordResetEmail(to: string, resetToken: string, userName: string, expiryHours: number, baseUrl?: string): Promise<void> {
     try {
       const transporter = await this.getTransporter();
 
-      // Construct reset URL (using environment variable for base URL)
-      const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
+      // Construct reset URL (use provided baseUrl, fallback to env, then localhost)
+      const frontendUrl = baseUrl || process.env.FRONTEND_URL || 'http://localhost:5173';
+      const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
 
       const mailOptions = {
         from: `"${emailConfig.from.name}" <${emailConfig.from.address}>`,

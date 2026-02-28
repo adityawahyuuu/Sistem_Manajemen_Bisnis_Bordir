@@ -5,10 +5,12 @@ export interface Customer {
   company_name?: string | null;
   email?: string | null;
   phone?: string | null;
-  whatsapp_numbers: any; // JSON type in Prisma
+  mobile_phone?: string | null;
   address?: string | null;
-  city?: string | null;
-  province?: string | null;
+  province_code?: string | null;
+  city_code?: string | null;
+  subdistrict_code?: string | null;
+  village_code?: string | null;
   postal_code?: string | null;
   created_at: Date | null;
   updated_at: Date | null;
@@ -19,10 +21,12 @@ export interface CreateCustomerDto {
   company_name?: string;
   email?: string;
   phone?: string;
-  whatsapp_numbers?: string[];
+  mobile_phone?: string;
   address?: string;
-  city?: string;
-  province?: string;
+  province_code?: string;
+  city_code?: string;
+  subdistrict_code?: string;
+  village_code?: string;
   postal_code?: string;
 }
 

@@ -5,8 +5,7 @@ import PizZip from 'pizzip';
 import htmlPdf from 'html-pdf-node';
 import { storageConfig } from '../../config';
 import { logger } from './logger.util';
-import { TemplateSchema } from '../../modules/templates/interfaces/template.interface';
-import { generateHtmlFromTemplate, DocumentData as TemplateDocumentData } from './html-builder.util';
+import { TemplateSchema, generateHtmlFromTemplate, DocumentData as TemplateDocumentData } from './html-builder.util';
 
 export interface DocumentData {
   [key: string]: unknown;

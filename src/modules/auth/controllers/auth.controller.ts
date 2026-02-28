@@ -14,6 +14,16 @@ import { AppError } from '../../../middleware/error.middleware';
 import { jwtService } from '../../../shared/services/jwt.service';
 import { ROLES, Role } from '../../../shared/constants/roles.constant';
 import { prisma } from '../../../config/prisma';
+import { appConfig } from '../../../config/app.config';
+
+const REFRESH_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: appConfig.env === 'production',
+  sameSite: (appConfig.env === 'production' ? 'strict' : 'lax') as 'strict' | 'lax',
+  // path: `${appConfig.apiPrefix}/auth/refresh-token`,
+  path: '/',
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+};
 
 export const authController = {
   async login(req: Request, res: Response, next: NextFunction) {
@@ -62,16 +72,11 @@ export const authController = {
           true
         );
 
-        // Return user data with tokens
-        sendAuthSuccessWithDates(
-          res,
-          user,
-          {
-            accessToken,
-            refreshToken,
-          },
-          'Login successful'
-        );
+        res.cookie('refreshToken', refreshToken, REFRESH_COOKIE_OPTIONS);
+
+        sendAuthSuccessWithDates(res, user, {
+          accessToken
+        });
       } catch (error: any) {
         // Record failed attempt
         const failureReason = error instanceof AppError ? error.message : 'Invalid credentials';
@@ -184,27 +189,23 @@ export const authController = {
 
   async refreshToken(req: Request, res: Response, next: NextFunction) {
     try {
-      const { refreshToken } = req.body;
+      const refreshToken = req.cookies?.refreshToken;
 
       if (!refreshToken) {
         return sendBadRequest(res, 'Refresh token is required');
       }
 
-      // Verify refresh token and generate new access token
       const result = await jwtService.refreshAccessToken(refreshToken);
 
-      sendSuccessWithDates(
-        res,
-        {
+      // Set rotated refresh token cookie
+      res.cookie('refreshToken', result.newRefreshToken, REFRESH_COOKIE_OPTIONS);
+
+      sendSuccessWithDates(res, {
+        auth: {
           accessToken: result.accessToken,
-          user: {
-            id: result.user.sub,
-            email: result.user.email,
-            role: result.user.role,
-          },
+          expiresIn: 900,
         },
-        'Token refreshed successfully'
-      );
+      });
     } catch (error) {
       next(error);
     }
@@ -212,12 +213,18 @@ export const authController = {
 
   async logout(req: Request, res: Response, next: NextFunction) {
     try {
-      const { refreshToken } = req.body;
+      const refreshToken = req.cookies?.refreshToken;
 
       if (refreshToken) {
-        // Revoke the refresh token
         await jwtService.revokeRefreshToken(refreshToken);
       }
+
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: appConfig.env === 'production',
+        sameSite: (appConfig.env === 'production' ? 'strict' : 'lax') as 'strict' | 'lax',
+        path: `${appConfig.apiPrefix}/auth/refresh-token`,
+      });
 
       sendSuccessWithDates(res, null, 'Logged out successfully');
     } catch (error) {
@@ -229,6 +236,10 @@ export const authController = {
     try {
       const { email } = req.body;
 
+      // Get frontend base URL from request origin or referer
+      const origin = req.get('origin') || req.get('referer');
+      const frontendUrl = origin ? new URL(origin).origin : undefined;
+
       // Check if user exists (following OWASP: return consistent message)
       const userExists = await authService.checkIsAnyEmail(email);
 
@@ -239,13 +250,14 @@ export const authController = {
         // Generate reset token
         const resetToken = await passwordResetService.createResetToken(email);
 
-        // Send reset email
+        // Send reset email with dynamic frontend URL
         const expiryHours = passwordResetService.getTokenExpiryHours();
         await emailService.sendPasswordResetEmail(
           email,
           resetToken,
           user?.name || 'User',
-          expiryHours
+          expiryHours,
+          frontendUrl
         );
       }
 

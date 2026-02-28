@@ -8,32 +8,29 @@ datasource db {
 }
 
 model companies {
-  id                 Int                     @id @default(autoincrement())
-  user_id            Int
-  domain             String?                 @db.VarChar(255)
-  is_active          Boolean                 @default(true)
-  created_at         DateTime?               @default(now()) @db.Timestamp(0)
-  updated_at         DateTime?               @default(now()) @db.Timestamp(0)
-  deleted_at         DateTime?               @db.Timestamp(0)
-  address            String?                 @db.Text
-  city               String?                 @db.VarChar(100)
-  email              String?                 @db.VarChar(255)
-  name               String                  @db.VarChar(255)
-  phone              String?                 @db.VarChar(50)
-  postal_code        String?                 @db.VarChar(20)
-  province           String?                 @db.VarChar(100)
-  logo_url           String?                 @db.VarChar(500)
-  users              users                   @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "fk_companies_user_id")
-  cash_accounts      company_cash_accounts[]
-  company_modules    company_modules[]
-  company_settings   company_settings?
-  customers          customers[]
-  document_templates document_templates[]
-  invoices           invoices[]
-  items              items[]
-  receipts           receipts[]
-  template_photos    template_photos[]
-  waybills           waybills[]
+  id               Int               @id @default(autoincrement())
+  user_id          Int
+  domain           String?           @db.VarChar(255)
+  is_active        Boolean           @default(true)
+  created_at       DateTime?         @default(now()) @db.Timestamp(0)
+  updated_at       DateTime?         @default(now()) @db.Timestamp(0)
+  deleted_at       DateTime?         @db.Timestamp(0)
+  address          String?           @db.Text
+  city             String?           @db.VarChar(100)
+  email            String?           @db.VarChar(255)
+  name             String            @db.VarChar(255)
+  phone            String?           @db.VarChar(50)
+  postal_code      String?           @db.VarChar(20)
+  province         String?           @db.VarChar(100)
+  logo_url         String?           @db.VarChar(500)
+  users            users             @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "fk_companies_user_id")
+  company_settings company_settings?
+  customers        customers[]
+  invoices         invoices[]
+  items            items[]
+  receipts          receipts[]
+  waybills          waybills[]
+  invoice_payments  invoice_payments[]
 
   @@index([user_id], map: "fk_companies_user_id")
 }
@@ -62,36 +59,6 @@ model company_settings {
   @@index([company_id], map: "idx_settings_company")
 }
 
-model company_cash_accounts {
-  id              Int       @id @default(autoincrement())
-  company_id      Int
-  account_name    String    @db.VarChar(255)
-  account_number  String?   @db.VarChar(100)
-  bank_name       String?   @db.VarChar(255)
-  initial_balance Decimal   @default(0.00) @db.Decimal(15, 2)
-  current_balance Decimal   @default(0.00) @db.Decimal(15, 2)
-  description     String?   @db.Text
-  is_active       Boolean   @default(true)
-  created_at      DateTime? @default(now()) @db.Timestamp(0)
-  updated_at      DateTime? @default(now()) @db.Timestamp(0)
-  companies       companies @relation(fields: [company_id], references: [id], onDelete: Cascade, map: "fk_cash_company")
-
-  @@index([company_id], map: "idx_cash_company")
-}
-
-model company_modules {
-  id          Int       @id @default(autoincrement())
-  company_id  Int
-  module_name String    @db.VarChar(50)
-  is_enabled  Boolean   @default(true)
-  config      Json?
-  created_at  DateTime? @default(now()) @db.Timestamp(0)
-  updated_at  DateTime? @default(now()) @db.Timestamp(0)
-  companies   companies @relation(fields: [company_id], references: [id], onDelete: Cascade, map: "fk_modules_company")
-
-  @@unique([company_id, module_name], map: "unique_company_module")
-  @@index([company_id], map: "idx_modules_company")
-}
 
 model customers {
   id               Int              @id @default(autoincrement())
@@ -100,11 +67,13 @@ model customers {
   company_name     String?          @db.VarChar(255)
   email            String?          @db.VarChar(255)
   phone            String?          @db.VarChar(50)
-  whatsapp_numbers Json?
+  mobile_phone     String?          @db.VarChar(50)
   address          String?          @db.Text
-  city             String?          @default("Tasikmalaya") @db.VarChar(100)
-  province         String?          @default("Jawa Barat") @db.VarChar(100)
-  postal_code      String?          @db.VarChar(20)
+  province_code    String?          @db.VarChar(10)
+  city_code        String?          @db.VarChar(10)
+  subdistrict_code String?          @db.VarChar(10)
+  village_code     String?          @db.VarChar(10)
+  postal_code      String?          @db.VarChar(10)
   created_at       DateTime?        @default(now()) @db.Timestamp(0)
   updated_at       DateTime?        @default(now()) @db.Timestamp(0)
   customer_items   customer_items[]
@@ -119,19 +88,16 @@ model customers {
 model items {
   id             Int              @id @default(autoincrement())
   company_id     Int
-  item_code      String           @db.VarChar(100)
   item_name      String           @db.VarChar(255)
   description    String?          @db.Text
   unit           String?          @default("pcs") @db.VarChar(50)
   unit_price     Decimal          @default(0.00) @db.Decimal(15, 2)
-  is_active      Boolean          @default(true)
   created_at     DateTime?        @default(now()) @db.Timestamp(0)
   updated_at     DateTime?        @default(now()) @db.Timestamp(0)
   category       String?          @db.VarChar(100)
   customer_items customer_items[]
   companies      companies        @relation(fields: [company_id], references: [id], onDelete: Cascade, map: "fk_items_company")
 
-  @@unique([company_id, item_code], map: "unique_item_code_per_company")
   @@index([company_id], map: "idx_items_company")
 }
 
@@ -152,15 +118,18 @@ model customer_items {
 }
 
 model invoice_items {
-  id          Int       @id @default(autoincrement())
-  invoice_id  Int
-  item_name   String    @db.VarChar(255)
-  description String?   @db.Text
-  quantity    Int       @default(1)
-  unit_price  Decimal   @default(0.00) @db.Decimal(15, 2)
-  total_price Decimal   @default(0.00) @db.Decimal(15, 2)
-  created_at  DateTime? @default(now()) @db.Timestamp(0)
-  item_id     Int
+  id              Int       @id @default(autoincrement())
+  invoice_id      Int
+  item_id         Int
+  item_name       String    @db.VarChar(255)
+  description     String?   @db.Text
+  quantity        Int       @default(1)
+  unit            String?   @default("pcs") @db.VarChar(50)
+  unit_price      Decimal   @default(0.00) @db.Decimal(15, 2)
+  discount_type   invoice_items_discount_type @default(Rp)
+  discount_amount Decimal   @default(0.00) @db.Decimal(15, 2)
+  total_price     Decimal   @default(0.00) @db.Decimal(15, 2)
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
   invoices    invoices  @relation(fields: [invoice_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_invoice_items_invoice_id")
 
   @@index([invoice_id], map: "fk_invoice_items_invoice_id")
@@ -174,17 +143,22 @@ model invoices {
   invoice_number      String          @db.VarChar(100)
   invoice_date        DateTime        @db.Date
   due_date            DateTime?       @db.Date
+  po_number           String?         @db.VarChar(100)
   subtotal            Decimal         @default(0.00) @db.Decimal(15, 2)
   tax_amount          Decimal         @default(0.00) @db.Decimal(15, 2)
   discount_amount     Decimal         @default(0.00) @db.Decimal(15, 2)
+  shipping_cost       Decimal         @default(0.00) @db.Decimal(15, 2)
   total_amount        Decimal         @default(0.00) @db.Decimal(15, 2)
-  status              invoices_status @default(draft)
-  notes               String?         @db.Text
+  status              invoices_status         @default(draft)
+  total_paid          Decimal                 @default(0.00) @db.Decimal(15, 2)
+  payment_status      invoices_payment_status @default(belum_bayar)
+  notes               String?                 @db.Text
   generated_file_path String?         @db.VarChar(500)
   created_by          Int
   created_at          DateTime?       @default(now()) @db.Timestamp(0)
   updated_at          DateTime?       @default(now()) @db.Timestamp(0)
   invoice_items       invoice_items[]
+  invoice_payments    invoice_payments[]
   companies           companies       @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_invoices_company_id")
   users               users           @relation(fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_invoices_created_by")
   customers           customers       @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_invoices_customer_id")
@@ -196,10 +170,29 @@ model invoices {
   @@index([customer_id], map: "fk_invoices_customer_id")
 }
 
+model invoice_payments {
+  id             Int                     @id @default(autoincrement())
+  invoice_id     Int
+  company_id     Int
+  payment_date   DateTime                @db.Date
+  amount         Decimal                 @default(0.00) @db.Decimal(15, 2)
+  payment_method receipts_payment_method @default(cash)
+  notes          String?                 @db.Text
+  created_by     Int
+  created_at     DateTime?               @default(now()) @db.Timestamp(0)
+  updated_at     DateTime?               @default(now()) @db.Timestamp(0)
+  invoices       invoices                @relation(fields: [invoice_id], references: [id], onDelete: Cascade)
+  companies      companies               @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  users          users                   @relation(fields: [created_by], references: [id])
+
+  @@index([invoice_id])
+  @@index([company_id])
+}
+
 model receipts {
   id                  Int                     @id @default(autoincrement())
   company_id          Int
-  invoice_id          Int?
+  invoice_id          Int
   customer_id         Int
   receipt_number      String                  @db.VarChar(100)
   receipt_date        DateTime                @db.Date
@@ -208,6 +201,7 @@ model receipts {
   description         String?                 @db.Text
   received_by         String?                 @db.VarChar(255)
   notes               String?                 @db.Text
+  status              receipts_status         @default(dp)
   generated_file_path String?                 @db.VarChar(500)
   created_by          Int
   created_at          DateTime?               @default(now()) @db.Timestamp(0)
@@ -215,7 +209,7 @@ model receipts {
   companies           companies               @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_receipts_company_id")
   users               users                   @relation(fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_receipts_created_by")
   customers           customers               @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_receipts_customer_id")
-  invoices            invoices?               @relation(fields: [invoice_id], references: [id], onUpdate: NoAction, map: "fk_receipts_invoice_id")
+  invoices            invoices                @relation(fields: [invoice_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_receipts_invoice_id")
 
   @@unique([company_id, receipt_number], map: "unique_receipt_number_per_company")
   @@index([created_by], map: "fk_receipts_created_by")
@@ -224,22 +218,21 @@ model receipts {
 }
 
 model users {
-  id                 Int                          @id @default(autoincrement())
-  name               String                       @db.VarChar(255)
-  email              String                       @unique @db.VarChar(255)
-  password           String                       @db.VarChar(255)
-  last_logged_in_at  DateTime?                    @db.Timestamp(0)
-  is_active          Boolean                      @default(true)
-  created_at         DateTime?                    @default(now()) @db.Timestamp(0)
-  updated_at         DateTime?                    @default(now()) @db.Timestamp(0)
-  deleted_at         DateTime?                    @db.Timestamp(0)
-  role               String                       @default("USER") @db.VarChar(50)
-  companies          companies[]
-  published_versions document_template_versions[] @relation("version_published_by")
-  created_templates  document_templates[]         @relation("template_created_by")
-  invoices           invoices[]
-  receipts           receipts[]
-  waybills           waybills[]
+  id                Int       @id @default(autoincrement())
+  name              String    @db.VarChar(255)
+  email             String    @unique @db.VarChar(255)
+  password          String    @db.VarChar(255)
+  last_logged_in_at DateTime? @db.Timestamp(0)
+  is_active         Boolean   @default(true)
+  created_at        DateTime? @default(now()) @db.Timestamp(0)
+  updated_at        DateTime? @default(now()) @db.Timestamp(0)
+  deleted_at        DateTime? @db.Timestamp(0)
+  role              String    @default("USER") @db.VarChar(50)
+  companies         companies[]
+  invoices          invoices[]
+  receipts          receipts[]
+  waybills          waybills[]
+  invoice_payments  invoice_payments[]
 }
 
 model waybill_items {
@@ -258,13 +251,14 @@ model waybill_items {
 model waybills {
   id                   Int             @id @default(autoincrement())
   company_id           Int
-  invoice_id           Int?
+  invoice_id           Int
   customer_id          Int
   waybill_number       String          @db.VarChar(100)
   waybill_date         DateTime        @db.Date
   destination_address  String          @db.Text
   destination_city     String          @default("Tasikmalaya") @db.VarChar(100)
   destination_province String          @default("Jawa Barat") @db.VarChar(100)
+  expedition_name      String?         @db.VarChar(255)
   vehicle_number       String?         @db.VarChar(50)
   driver_name          String?         @db.VarChar(255)
   notes                String?         @db.Text
@@ -277,12 +271,66 @@ model waybills {
   companies            companies       @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_waybills_company_id")
   users                users           @relation(fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_waybills_created_by")
   customers            customers       @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_waybills_customer_id")
-  invoices             invoices?       @relation(fields: [invoice_id], references: [id], onUpdate: NoAction, map: "fk_waybills_invoice_id")
+  invoices             invoices        @relation(fields: [invoice_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_waybills_invoice_id")
 
   @@unique([company_id, waybill_number], map: "unique_waybill_number_per_company")
   @@index([created_by], map: "fk_waybills_created_by")
   @@index([customer_id], map: "fk_waybills_customer_id")
   @@index([invoice_id], map: "fk_waybills_invoice_id")
+}
+
+model provinces {
+  id         Int       @id @default(autoincrement())
+  code       String    @unique @db.VarChar(10)
+  name       String    @db.VarChar(255)
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  updated_at DateTime? @default(now()) @db.Timestamp(0)
+  cities     cities[]
+
+  @@index([code], map: "idx_provinces_code")
+}
+
+model cities {
+  id            Int           @id @default(autoincrement())
+  province_code String        @db.VarChar(10)
+  code          String        @unique @db.VarChar(10)
+  name          String        @db.VarChar(255)
+  created_at    DateTime?     @default(now()) @db.Timestamp(0)
+  updated_at    DateTime?     @default(now()) @db.Timestamp(0)
+  provinces     provinces     @relation(fields: [province_code], references: [code], onDelete: Cascade, map: "fk_cities_province_code")
+  subdistricts  subdistricts[]
+
+  @@index([province_code], map: "idx_cities_province_code")
+  @@index([code], map: "idx_cities_code")
+}
+
+model subdistricts {
+  id         Int       @id @default(autoincrement())
+  city_code  String    @db.VarChar(10)
+  code       String    @unique @db.VarChar(10)
+  name       String    @db.VarChar(255)
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  updated_at DateTime? @default(now()) @db.Timestamp(0)
+  cities     cities    @relation(fields: [city_code], references: [code], onDelete: Cascade, map: "fk_subdistricts_city_code")
+  villages   villages[]
+
+  @@index([city_code], map: "idx_subdistricts_city_code")
+  @@index([code], map: "idx_subdistricts_code")
+}
+
+model villages {
+  id               Int          @id @default(autoincrement())
+  subdistrict_code String       @db.VarChar(10)
+  code             String       @unique @db.VarChar(10)
+  name             String       @db.VarChar(255)
+  postal_code      String?      @db.VarChar(10)
+  created_at       DateTime?    @default(now()) @db.Timestamp(0)
+  updated_at       DateTime?    @default(now()) @db.Timestamp(0)
+  subdistricts     subdistricts @relation(fields: [subdistrict_code], references: [code], onDelete: Cascade, map: "fk_villages_subdistrict_code")
+
+  @@index([subdistrict_code], map: "idx_villages_subdistrict_code")
+  @@index([code], map: "idx_villages_code")
+  @@index([postal_code], map: "idx_villages_postal_code")
 }
 
 model otp_codes {
@@ -336,53 +384,24 @@ model refresh_tokens {
   @@index([token], map: "idx_refresh_token")
 }
 
-model document_templates {
-  id              Int                          @id @default(autoincrement())
-  company_id      Int?
-  name            String                       @db.VarChar(255)
-  description     String?                      @db.Text
-  document_type   document_template_type
-  template_schema Json
-  version         Int                          @default(1)
-  status          document_template_status     @default(draft)
-  is_default      Boolean                      @default(false)
-  is_system       Boolean                      @default(false)
-  created_by      Int?
-  created_at      DateTime?                    @default(now()) @db.Timestamp(0)
-  updated_at      DateTime?                    @default(now()) @db.Timestamp(0)
-  published_at    DateTime?                    @db.Timestamp(0)
-  deleted_at      DateTime?                    @db.Timestamp(0)
-  versions        document_template_versions[]
-  companies       companies?                   @relation(fields: [company_id], references: [id], onDelete: Cascade, map: "fk_templates_company")
-  created_by_user users?                       @relation("template_created_by", fields: [created_by], references: [id], map: "fk_templates_created_by")
-
-  @@unique([company_id, document_type, deleted_at], map: "unique_template_type_per_company_active")
-  @@index([company_id], map: "idx_templates_company")
-  @@index([document_type], map: "idx_templates_type")
-  @@index([status], map: "idx_templates_status")
-  @@index([created_by], map: "idx_templates_created_by")
-}
-
-model document_template_versions {
-  id                Int                @id @default(autoincrement())
-  template_id       Int
-  version           Int
-  template_schema   Json
-  published_by      Int?
-  published_at      DateTime           @default(now()) @db.Timestamp(0)
-  published_by_user users?             @relation("version_published_by", fields: [published_by], references: [id], map: "fk_versions_published_by")
-  template          document_templates @relation(fields: [template_id], references: [id], onDelete: Cascade, map: "fk_versions_template")
-
-  @@unique([template_id, version], map: "unique_template_version")
-  @@index([template_id], map: "idx_versions_template")
-  @@index([published_by], map: "idx_versions_published_by")
-}
 
 enum receipts_payment_method {
   cash
   transfer
   check
   other
+}
+
+enum receipts_status {
+  lunas
+  dp
+  piutang
+}
+
+enum invoices_payment_status {
+  belum_bayar
+  dp
+  lunas
 }
 
 enum invoices_status {
@@ -398,30 +417,8 @@ enum waybills_status {
   delivered
 }
 
-enum document_template_type {
-  invoice
-  receipt
-  waybill
+enum invoice_items_discount_type {
+  Rp
+  persen
 }
 
-enum document_template_status {
-  draft
-  published
-}
-
-model template_photos {
-  id           Int       @id @default(autoincrement())
-  company_id   Int
-  filename     String    @db.VarChar(255)
-  original_name String   @db.VarChar(255)
-  file_path    String    @db.VarChar(500)
-  file_url     String    @db.VarChar(500)
-  mime_type    String    @db.VarChar(100)
-  file_size    Int
-  uploaded_by  Int
-  created_at   DateTime? @default(now()) @db.Timestamp(0)
-  deleted_at   DateTime? @db.Timestamp(0)
-  companies    companies @relation(fields: [company_id], references: [id], onDelete: Cascade, map: "fk_template_photos_company")
-
-  @@index([company_id], map: "idx_template_photos_company")
-}

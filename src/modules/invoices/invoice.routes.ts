@@ -6,14 +6,14 @@ import {
   updateInvoiceSchema,
   invoiceQuerySchema,
   companyIdParamSchema,
+  createPaymentSchema,
+  updatePaymentSchema,
 } from './validators/invoice.validator';
 
 const router = Router();
 
-// All routes require authentication
 router.use(authMiddleware);
 
-// Invoices Routes
 /**
  * @swagger
  * /invoices/{companyId}:
@@ -28,7 +28,6 @@ router.use(authMiddleware);
  *         required: true
  *         schema:
  *           type: integer
- *         description: Company ID
  *       - in: query
  *         name: page
  *         schema:
@@ -48,19 +47,31 @@ router.use(authMiddleware);
  *         name: customer_id
  *         schema:
  *           type: integer
- *         description: Filter by customer ID
  *       - in: query
  *         name: search
  *         schema:
  *           type: string
- *         description: Search by invoice number or customer name
+ *       - in: query
+ *         name: date_from
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter invoices from this date (invoice_date >=)
+ *       - in: query
+ *         name: date_to
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter invoices up to this date (invoice_date <=)
+ *       - in: query
+ *         name: payment_status
+ *         schema:
+ *           type: string
+ *           enum: [lunas, dp, belum_bayar]
+ *         description: Filter by payment status (computed from receipts)
  *     responses:
  *       200:
  *         description: Invoices retrieved successfully
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       404:
- *         description: Company not found
  */
 router.get('/:companyId', validate(companyIdParamSchema, 'params'), validate(invoiceQuerySchema, 'query'), invoiceController.findAllByCompany);
 
@@ -78,7 +89,6 @@ router.get('/:companyId', validate(companyIdParamSchema, 'params'), validate(inv
  *         required: true
  *         schema:
  *           type: integer
- *         description: Company ID
  *     requestBody:
  *       required: true
  *       content:
@@ -91,42 +101,61 @@ router.get('/:companyId', validate(companyIdParamSchema, 'params'), validate(inv
  *             properties:
  *               customer_id:
  *                 type: integer
- *                 example: 1
  *               invoice_date:
  *                 type: string
  *                 format: date
- *                 example: '2026-01-17'
  *               due_date:
  *                 type: string
  *                 format: date
- *                 example: '2026-02-17'
+ *               po_number:
+ *                 type: string
+ *                 example: PO-2026-001
  *               tax_amount:
  *                 type: number
- *                 minimum: 0
  *                 default: 0
- *                 example: 50000
  *               discount_amount:
  *                 type: number
- *                 minimum: 0
  *                 default: 0
- *                 example: 10000
+ *               shipping_cost:
+ *                 type: number
+ *                 default: 0
  *               notes:
  *                 type: string
- *                 example: Pembayaran via transfer
  *               items:
  *                 type: array
  *                 minItems: 1
  *                 items:
- *                   $ref: '#/components/schemas/InvoiceItem'
+ *                   type: object
+ *                   required:
+ *                     - item_id
+ *                     - name
+ *                     - quantity
+ *                     - unit_price
+ *                   properties:
+ *                     item_id:
+ *                       type: integer
+ *                     name:
+ *                       type: string
+ *                     description:
+ *                       type: string
+ *                     quantity:
+ *                       type: number
+ *                     unit:
+ *                       type: string
+ *                       default: pcs
+ *                     unit_price:
+ *                       type: number
+ *                     discount_type:
+ *                       type: string
+ *                       enum: [Rp, persen]
+ *                       default: Rp
+ *                       description: "'Rp' = nominal tetap, 'persen' = persentase dari subtotal item"
+ *                     discount_amount:
+ *                       type: number
+ *                       default: 0
  *     responses:
  *       201:
  *         description: Invoice created successfully
- *       400:
- *         description: Validation error
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       404:
- *         description: Company or customer not found
  */
 router.post('/:companyId', validate(companyIdParamSchema, 'params'), validate(createInvoiceSchema, 'body'), invoiceController.create);
 
@@ -134,7 +163,7 @@ router.post('/:companyId', validate(companyIdParamSchema, 'params'), validate(cr
  * @swagger
  * /invoices/{companyId}/{id}:
  *   get:
- *     summary: Get invoice by ID
+ *     summary: Get invoice by ID (includes payment history)
  *     tags: [Invoices]
  *     security:
  *       - bearerAuth: []
@@ -144,20 +173,14 @@ router.post('/:companyId', validate(companyIdParamSchema, 'params'), validate(cr
  *         required: true
  *         schema:
  *           type: integer
- *         description: Company ID
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: integer
- *         description: Invoice ID
  *     responses:
  *       200:
  *         description: Invoice retrieved successfully
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       404:
- *         description: Invoice or company not found
  */
 router.get('/:companyId/:id', validate(companyIdParamSchema, 'params'), invoiceController.findById);
 
@@ -175,15 +198,12 @@ router.get('/:companyId/:id', validate(companyIdParamSchema, 'params'), invoiceC
  *         required: true
  *         schema:
  *           type: integer
- *         description: Company ID
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: integer
- *         description: Invoice ID
  *     requestBody:
- *       required: true
  *       content:
  *         application/json:
  *           schema:
@@ -192,12 +212,14 @@ router.get('/:companyId/:id', validate(companyIdParamSchema, 'params'), invoiceC
  *               due_date:
  *                 type: string
  *                 format: date
+ *               po_number:
+ *                 type: string
  *               tax_amount:
  *                 type: number
- *                 minimum: 0
  *               discount_amount:
  *                 type: number
- *                 minimum: 0
+ *               shipping_cost:
+ *                 type: number
  *               notes:
  *                 type: string
  *               status:
@@ -206,12 +228,6 @@ router.get('/:companyId/:id', validate(companyIdParamSchema, 'params'), invoiceC
  *     responses:
  *       200:
  *         description: Invoice updated successfully
- *       400:
- *         description: Validation error or cannot update paid/cancelled invoice
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       404:
- *         description: Invoice or company not found
  */
 router.put('/:companyId/:id', validate(companyIdParamSchema, 'params'), validate(updateInvoiceSchema, 'body'), invoiceController.update);
 
@@ -229,24 +245,41 @@ router.put('/:companyId/:id', validate(companyIdParamSchema, 'params'), validate
  *         required: true
  *         schema:
  *           type: integer
- *         description: Company ID
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: integer
- *         description: Invoice ID
  *     responses:
  *       200:
  *         description: Invoice deleted successfully
- *       400:
- *         description: Cannot delete invoice with linked receipts or waybills
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       404:
- *         description: Invoice or company not found
  */
 router.delete('/:companyId/:id', validate(companyIdParamSchema, 'params'), invoiceController.delete);
+
+/**
+ * @swagger
+ * /invoices/{companyId}/{id}/payments:
+ *   get:
+ *     summary: Get payment history for an invoice (cicilan)
+ *     tags: [Invoices]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: companyId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Payment history retrieved successfully
+ */
+router.get('/:companyId/:id/payments', validate(companyIdParamSchema, 'params'), invoiceController.getPaymentHistory);
 
 /**
  * @swagger
@@ -262,39 +295,14 @@ router.delete('/:companyId/:id', validate(companyIdParamSchema, 'params'), invoi
  *         required: true
  *         schema:
  *           type: integer
- *         description: Company ID
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: integer
- *         description: Invoice ID
  *     responses:
  *       200:
  *         description: Invoice PDF generated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 type:
- *                   type: string
- *                   example: success
- *                 message:
- *                   type: string
- *                   example: Invoice document generated successfully
- *                 data:
- *                   type: object
- *                   properties:
- *                     fileName:
- *                       type: string
- *                       example: invoice-INV-202601-0001.pdf
- *                     invoice:
- *                       $ref: '#/components/schemas/Invoice'
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       404:
- *         description: Invoice or company not found
  */
 router.post('/:companyId/:id/generate', validate(companyIdParamSchema, 'params'), invoiceController.generate);
 
@@ -312,13 +320,11 @@ router.post('/:companyId/:id/generate', validate(companyIdParamSchema, 'params')
  *         required: true
  *         schema:
  *           type: integer
- *         description: Company ID
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: integer
- *         description: Invoice ID
  *     responses:
  *       200:
  *         description: PDF file download
@@ -327,12 +333,6 @@ router.post('/:companyId/:id/generate', validate(companyIdParamSchema, 'params')
  *             schema:
  *               type: string
  *               format: binary
- *       400:
- *         description: Invoice document not generated yet
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       404:
- *         description: Invoice, company, or file not found
  */
 router.get('/:companyId/:id/download', validate(companyIdParamSchema, 'params'), invoiceController.download);
 
@@ -350,13 +350,11 @@ router.get('/:companyId/:id/download', validate(companyIdParamSchema, 'params'),
  *         required: true
  *         schema:
  *           type: integer
- *         description: Company ID
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
  *           type: integer
- *         description: Invoice ID
  *     requestBody:
  *       required: true
  *       content:
@@ -372,13 +370,129 @@ router.get('/:companyId/:id/download', validate(companyIdParamSchema, 'params'),
  *     responses:
  *       200:
  *         description: Invoice status updated successfully
- *       400:
- *         description: Cannot update cancelled invoice
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       404:
- *         description: Invoice or company not found
  */
 router.patch('/:companyId/:id/status', validate(companyIdParamSchema, 'params'), invoiceController.updateStatus);
+
+/**
+ * @swagger
+ * /invoices/{companyId}/{id}/payments:
+ *   post:
+ *     summary: Add a payment installment to an invoice
+ *     tags: [Invoices]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: companyId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - payment_date
+ *               - amount
+ *               - payment_method
+ *             properties:
+ *               payment_date:
+ *                 type: string
+ *                 format: date
+ *               amount:
+ *                 type: number
+ *               payment_method:
+ *                 type: string
+ *                 enum: [cash, transfer, check, other]
+ *               notes:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Payment added successfully
+ */
+router.post('/:companyId/:id/payments', validate(companyIdParamSchema, 'params'), validate(createPaymentSchema, 'body'), invoiceController.addPayment);
+
+/**
+ * @swagger
+ * /invoices/{companyId}/{id}/payments/{paymentId}:
+ *   put:
+ *     summary: Update an existing payment installment
+ *     tags: [Invoices]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: companyId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: paymentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               payment_date:
+ *                 type: string
+ *                 format: date
+ *               amount:
+ *                 type: number
+ *               payment_method:
+ *                 type: string
+ *                 enum: [cash, transfer, check, other]
+ *               notes:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Payment updated successfully
+ */
+router.put('/:companyId/:id/payments/:paymentId', validate(companyIdParamSchema, 'params'), validate(updatePaymentSchema, 'body'), invoiceController.updatePayment);
+
+/**
+ * @swagger
+ * /invoices/{companyId}/{id}/payments/{paymentId}:
+ *   delete:
+ *     summary: Delete a payment installment
+ *     tags: [Invoices]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: companyId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: paymentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Payment deleted successfully
+ */
+router.delete('/:companyId/:id/payments/:paymentId', validate(companyIdParamSchema, 'params'), invoiceController.deletePayment);
 
 export default router;

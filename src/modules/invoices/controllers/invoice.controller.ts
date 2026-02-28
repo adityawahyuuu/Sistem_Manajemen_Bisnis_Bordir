@@ -4,7 +4,6 @@ import * as path from 'path';
 import { invoiceService } from '../services/invoice.service';
 import {
   sendSuccess,
-  sendCreated,
   sendFail,
   sendSuccessWithDates,
   sendCreatedWithDates,
@@ -12,10 +11,6 @@ import {
 import { invoices_status } from '../../../../prisma/generated/prisma';
 
 export const invoiceController = {
-  /**
-   * Get all invoices for a company
-   * GET /invoices/company/:companyId
-   */
   async findAllByCompany(req: Request, res: Response, next: NextFunction) {
     try {
       const companyId = parseInt(req.params.companyId);
@@ -23,36 +18,24 @@ export const invoiceController = {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
       const status = req.query.status as invoices_status | undefined;
-      const customerId = req.query.customer_id
-        ? parseInt(req.query.customer_id as string)
-        : undefined;
+      const customerId = req.query.customer_id ? parseInt(req.query.customer_id as string) : undefined;
       const search = req.query.search as string | undefined;
+      const dateFrom = req.query.date_from ? new Date(req.query.date_from as string) : undefined;
+      const dateTo = req.query.date_to ? new Date(req.query.date_to as string) : undefined;
+      const paymentStatus = req.query.payment_status as 'lunas' | 'dp' | 'belum_bayar' | undefined;
 
       const { data, total } = await invoiceService.findAllByCompany(
-        companyId,
-        userId,
-        page,
-        limit,
-        status,
-        customerId,
-        search
+        companyId, userId, page, limit, status, customerId, search, dateFrom, dateTo, paymentStatus
       );
 
       sendSuccessWithDates(res, data, 'Invoices retrieved', 200, {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
+        page, limit, total, totalPages: Math.ceil(total / limit),
       });
     } catch (error) {
       next(error);
     }
   },
 
-  /**
-   * Get invoice by ID
-   * GET /invoices/company/:companyId/:id
-   */
   async findById(req: Request, res: Response, next: NextFunction) {
     try {
       const id = parseInt(req.params.id);
@@ -66,10 +49,6 @@ export const invoiceController = {
     }
   },
 
-  /**
-   * Create new invoice
-   * POST /invoices/company/:companyId
-   */
   async create(req: Request, res: Response, next: NextFunction) {
     try {
       const companyId = parseInt(req.params.companyId);
@@ -86,10 +65,6 @@ export const invoiceController = {
     }
   },
 
-  /**
-   * Update invoice
-   * PUT /invoices/company/:companyId/:id
-   */
   async update(req: Request, res: Response, next: NextFunction) {
     try {
       const id = parseInt(req.params.id);
@@ -103,10 +78,6 @@ export const invoiceController = {
     }
   },
 
-  /**
-   * Delete invoice
-   * DELETE /invoices/company/:companyId/:id
-   */
   async delete(req: Request, res: Response, next: NextFunction) {
     try {
       const id = parseInt(req.params.id);
@@ -120,38 +91,33 @@ export const invoiceController = {
     }
   },
 
-  /**
-   * Generate PDF for invoice
-   * POST /invoices/company/:companyId/:id/generate
-   * Query params:
-   *   - templateId: (optional) ID of the template to use
-   */
-  async generate(req: Request, res: Response, next: NextFunction) {
+  async getPaymentHistory(req: Request, res: Response, next: NextFunction) {
     try {
       const id = parseInt(req.params.id);
       const companyId = parseInt(req.params.companyId);
       const userId = parseInt(req.user!.id);
-      const templateId = req.query.templateId
-        ? parseInt(req.query.templateId as string)
-        : undefined;
 
-      const result = await invoiceService.generate(id, companyId, userId, templateId);
-      sendSuccessWithDates(
-        res,
-        {
-          fileName: result.fileName
-        },
-        'Invoice document generated successfully'
-      );
+      const history = await invoiceService.getPaymentHistory(id, companyId, userId);
+      sendSuccessWithDates(res, history, 'Payment history retrieved');
     } catch (error) {
       next(error);
     }
   },
 
-  /**
-   * Download invoice PDF
-   * GET /invoices/company/:companyId/:id/download
-   */
+
+  async generate(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id);
+      const companyId = parseInt(req.params.companyId);
+      const userId = parseInt(req.user!.id);
+
+      const result = await invoiceService.generate(id, companyId, userId);
+      sendSuccessWithDates(res, { fileName: result.fileName }, 'Invoice document generated successfully');
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async download(req: Request, res: Response, next: NextFunction) {
     try {
       const id = parseInt(req.params.id);
@@ -160,19 +126,15 @@ export const invoiceController = {
 
       const filePath = await invoiceService.getFilePath(id, companyId, userId);
 
-      // Check if file exists
       if (!fs.existsSync(filePath)) {
         return sendFail(res, 'File not found', 404);
       }
 
       const fileName = path.basename(filePath);
-
-      // Set headers for file download
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
       res.setHeader('Content-Length', fs.statSync(filePath).size);
 
-      // Stream the file
       const fileStream = fs.createReadStream(filePath);
       fileStream.pipe(res);
     } catch (error) {
@@ -180,10 +142,47 @@ export const invoiceController = {
     }
   },
 
-  /**
-   * Update invoice status
-   * PATCH /invoices/company/:companyId/:id/status
-   */
+  async addPayment(req: Request, res: Response, next: NextFunction) {
+    try {
+      const invoiceId = parseInt(req.params.id);
+      const companyId = parseInt(req.params.companyId);
+      const userId = parseInt(req.user!.id);
+
+      const payment = await invoiceService.addPayment(invoiceId, companyId, userId, req.body);
+      sendCreatedWithDates(res, payment, 'Payment added successfully');
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async updatePayment(req: Request, res: Response, next: NextFunction) {
+    try {
+      const invoiceId = parseInt(req.params.id);
+      const paymentId = parseInt(req.params.paymentId);
+      const companyId = parseInt(req.params.companyId);
+      const userId = parseInt(req.user!.id);
+
+      const payment = await invoiceService.updatePayment(invoiceId, paymentId, companyId, userId, req.body);
+      sendSuccessWithDates(res, payment, 'Payment updated successfully');
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async deletePayment(req: Request, res: Response, next: NextFunction) {
+    try {
+      const invoiceId = parseInt(req.params.id);
+      const paymentId = parseInt(req.params.paymentId);
+      const companyId = parseInt(req.params.companyId);
+      const userId = parseInt(req.user!.id);
+
+      await invoiceService.deletePayment(invoiceId, paymentId, companyId, userId);
+      sendSuccess(res, null, 'Payment deleted successfully');
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async updateStatus(req: Request, res: Response, next: NextFunction) {
     try {
       const id = parseInt(req.params.id);

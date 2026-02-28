@@ -5,11 +5,13 @@ export const createCustomerSchema = Joi.object({
   company_name: Joi.string().max(255).allow('', null),
   email: Joi.string().email().allow('', null),
   phone: Joi.string().max(50).allow('', null),
-  whatsapp_numbers: Joi.array().items(Joi.string()).default([]),
+  mobile_phone: Joi.string().max(50).allow('', null),
   address: Joi.string().allow('', null),
-  city: Joi.string().max(100).allow('', null),
-  province: Joi.string().max(100).allow('', null),
-  postal_code: Joi.string().max(20).allow('', null),
+  province_code: Joi.string().max(10).allow('', null),
+  city_code: Joi.string().max(10).allow('', null),
+  subdistrict_code: Joi.string().max(10).allow('', null),
+  village_code: Joi.string().max(10).allow('', null),
+  postal_code: Joi.string().max(10).allow('', null),
 });
 
 export const updateCustomerSchema = Joi.object({
@@ -17,9 +19,11 @@ export const updateCustomerSchema = Joi.object({
   company_name: Joi.string().max(255).allow('', null),
   email: Joi.string().email().allow('', null),
   phone: Joi.string().max(50).allow('', null),
-  whatsapp_numbers: Joi.array().items(Joi.string()),
+  mobile_phone: Joi.string().max(50).allow('', null),
   address: Joi.string().allow('', null),
-  city: Joi.string().max(100).allow('', null),
-  province: Joi.string().max(100).allow('', null),
-  postal_code: Joi.string().max(20).allow('', null),
+  province_code: Joi.string().max(10).allow('', null),
+  city_code: Joi.string().max(10).allow('', null),
+  subdistrict_code: Joi.string().max(10).allow('', null),
+  village_code: Joi.string().max(10).allow('', null),
+  postal_code: Joi.string().max(10).allow('', null),
 });

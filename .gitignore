@@ -38,5 +38,5 @@ coverage/
 prisma/generated/
 *.md
 
-.claude
 nul
+mockup/

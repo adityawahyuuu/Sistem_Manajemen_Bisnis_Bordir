@@ -8,7 +8,7 @@ import {
   sendSuccessWithDates,
   sendCreatedWithDates,
 } from '../../../shared/utils/response.util';
-import { receipts_payment_method } from '../../../../prisma/generated/prisma';
+import { receipts_payment_method, receipts_status } from '../../../../prisma/generated/prisma';
 
 export const receiptController = {
   async findAllByCompany(req: Request, res: Response, next: NextFunction) {
@@ -20,10 +20,11 @@ export const receiptController = {
       const customerId = req.query.customer_id ? parseInt(req.query.customer_id as string) : undefined;
       const invoiceId = req.query.invoice_id ? parseInt(req.query.invoice_id as string) : undefined;
       const paymentMethod = req.query.payment_method as receipts_payment_method | undefined;
+      const status = req.query.status as receipts_status | undefined;
       const search = req.query.search as string | undefined;
 
       const { data, total } = await receiptService.findAllByCompany(
-        companyId, userId, page, limit, customerId, invoiceId, paymentMethod, search
+        companyId, userId, page, limit, customerId, invoiceId, paymentMethod, status, search
       );
 
       sendSuccessWithDates(res, data, 'Receipts retrieved', 200, {
@@ -94,16 +95,8 @@ export const receiptController = {
       const id = Number(req.params.id);
       const companyId = Number(req.params.companyId);
       const userId = Number(req.user!.id);
-      const templateId = req.query.templateId
-        ? Number(req.query.templateId)
-        : undefined;
 
-      const result = await receiptService.generate(
-        id,
-        companyId,
-        userId,
-        templateId
-      );
+      const result = await receiptService.generate(id, companyId, userId);
       sendSuccessWithDates(
         res,
         {

@@ -51,6 +51,11 @@ router.use(authMiddleware);
  *           type: string
  *           enum: [cash, transfer, check, other]
  *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [lunas, dp, piutang]
+ *       - in: query
  *         name: search
  *         schema:
  *           type: string
@@ -87,6 +92,7 @@ router.get(
  *             type: object
  *             required:
  *               - customer_id
+ *               - invoice_id
  *               - amount
  *             properties:
  *               customer_id:
@@ -105,6 +111,10 @@ router.get(
  *                 type: string
  *                 enum: [cash, transfer, check, other]
  *                 default: cash
+ *               status:
+ *                 type: string
+ *                 enum: [lunas, dp, piutang]
+ *                 default: dp
  *               description:
  *                 type: string
  *               received_by:
@@ -181,6 +191,9 @@ router.get(
  *               payment_method:
  *                 type: string
  *                 enum: [cash, transfer, check, other]
+ *               status:
+ *                 type: string
+ *                 enum: [lunas, dp, piutang]
  *               description:
  *                 type: string
  *               received_by:

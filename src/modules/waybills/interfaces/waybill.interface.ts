@@ -3,13 +3,14 @@ import { waybills_status } from '../../../../prisma/generated/prisma';
 export interface Waybill {
   id: number;
   company_id: number;
-  invoice_id?: number | null;
+  invoice_id: number;
   customer_id: number;
   waybill_number: string;
   waybill_date: Date;
   destination_address?: string | null;
   destination_city?: string | null;
   destination_province?: string | null;
+  expedition_name?: string | null;
   vehicle_number?: string | null;
   driver_name?: string | null;
   notes?: string | null;
@@ -32,12 +33,13 @@ export interface WaybillItem {
 
 export interface CreateWaybillDto {
   company_id: number;
-  invoice_id?: number;
+  invoice_id: number;
   customer_id: number;
   waybill_date?: string;
   destination_address?: string;
   destination_city?: string;
   destination_province?: string;
+  expedition_name?: string;
   vehicle_number?: string;
   driver_name?: string;
   notes?: string;
@@ -55,6 +57,7 @@ export interface UpdateWaybillDto {
   destination_address?: string;
   destination_city?: string;
   destination_province?: string;
+  expedition_name?: string;
   vehicle_number?: string;
   driver_name?: string;
   notes?: string;

@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { companyController } from './controllers/company.controller';
 import { companySettingsController } from './controllers/company-settings.controller';
-import { cashAccountController } from './controllers/cash-account.controller';
 import { validate, authMiddleware } from '../../middleware';
 import {
   createCompanySchema,
@@ -9,10 +8,6 @@ import {
   companyIdSchema,
 } from './validators/company.validators';
 import { updateSettingsSchema } from './validators/company-settings.validators';
-import {
-  createCashAccountSchema,
-  updateCashAccountSchema,
-} from './validators/cash-account.validators';
 import { uploadLogo } from '../../shared/utils/upload.util';
 
 const router = Router();
@@ -416,154 +411,5 @@ router.get('/:companyId/settings', companySettingsController.getSettings);
  *         description: Settings updated successfully
  */
 router.put('/:companyId/settings', validate(updateSettingsSchema), companySettingsController.updateSettings);
-
-// Cash Accounts Routes
-/**
- * @swagger
- * /companies/{companyId}/cash-accounts:
- *   get:
- *     summary: Get all cash accounts for company
- *     tags: [Companies]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: companyId
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Cash accounts retrieved successfully
- */
-router.get('/:companyId/cash-accounts', cashAccountController.getAllAccounts);
-
-/**
- * @swagger
- * /companies/{companyId}/cash-accounts/{accountId}:
- *   get:
- *     summary: Get cash account by ID
- *     tags: [Companies]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: companyId
- *         required: true
- *         schema:
- *           type: integer
- *       - in: path
- *         name: accountId
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Cash account retrieved successfully
- */
-router.get('/:companyId/cash-accounts/:accountId', cashAccountController.getAccountById);
-
-/**
- * @swagger
- * /companies/{companyId}/cash-accounts:
- *   post:
- *     summary: Create new cash account
- *     tags: [Companies]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: companyId
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - account_name
- *             properties:
- *               account_name:
- *                 type: string
- *                 example: Kas Utama
- *               account_number:
- *                 type: string
- *                 example: "1234567890"
- *               bank_name:
- *                 type: string
- *                 example: Bank BCA
- *               initial_balance:
- *                 type: number
- *                 example: 10000000
- *               description:
- *                 type: string
- *     responses:
- *       201:
- *         description: Cash account created successfully
- */
-router.post('/:companyId/cash-accounts', validate(createCashAccountSchema), cashAccountController.createAccount);
-
-/**
- * @swagger
- * /companies/{companyId}/cash-accounts/{accountId}:
- *   put:
- *     summary: Update cash account
- *     tags: [Companies]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: companyId
- *         required: true
- *         schema:
- *           type: integer
- *       - in: path
- *         name: accountId
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               account_name:
- *                 type: string
- *               is_active:
- *                 type: boolean
- *     responses:
- *       200:
- *         description: Cash account updated successfully
- */
-router.put('/:companyId/cash-accounts/:accountId', validate(updateCashAccountSchema), cashAccountController.updateAccount);
-
-/**
- * @swagger
- * /companies/{companyId}/cash-accounts/{accountId}:
- *   delete:
- *     summary: Delete cash account
- *     tags: [Companies]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: companyId
- *         required: true
- *         schema:
- *           type: integer
- *       - in: path
- *         name: accountId
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Cash account deleted successfully
- */
-router.delete('/:companyId/cash-accounts/:accountId', cashAccountController.deleteAccount);
 
 export default router;

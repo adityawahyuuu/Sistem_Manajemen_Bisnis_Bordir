@@ -53,9 +53,9 @@ class JwtService {
   }
 
   /**
-   * Verify and consume refresh token to generate new access token
+   * Verify and consume refresh token to generate new access token (with rotation)
    */
-  async refreshAccessToken(refreshToken: string): Promise<{ accessToken: string; user: JwtPayloadData }> {
+  async refreshAccessToken(refreshToken: string): Promise<{ accessToken: string; newRefreshToken: string; user: JwtPayloadData }> {
     // Find refresh token in database
     const storedToken = await prisma.refresh_tokens.findUnique({
       where: { token: refreshToken },
@@ -65,8 +65,10 @@ class JwtService {
       throw new AppError('Invalid refresh token', 401);
     }
 
+    // Token reuse detection: revoked token used again → revoke entire family
     if (storedToken.is_revoked) {
-      throw new AppError('Refresh token has been revoked', 401);
+      await this.revokeAllUserTokens(storedToken.user_id);
+      throw new AppError('Refresh token reuse detected. All sessions have been revoked.', 401);
     }
 
     if (new Date() > storedToken.expires_at) {
@@ -86,6 +88,12 @@ class JwtService {
       throw new AppError('User account is not active', 403);
     }
 
+    // Rotation: invalidate old token
+    await this.revokeRefreshToken(refreshToken);
+
+    // Generate new refresh token
+    const newRefreshToken = await this.generateRefreshToken(user.id);
+
     // Generate new access token
     const payload: JwtPayloadData = {
       sub: user.id.toString(),
@@ -95,7 +103,7 @@ class JwtService {
 
     const accessToken = this.sign(payload);
 
-    return { accessToken, user: payload };
+    return { accessToken, newRefreshToken, user: payload };
   }
 
   /**

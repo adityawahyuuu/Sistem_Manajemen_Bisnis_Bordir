@@ -38,7 +38,6 @@ export const itemService = {
   },
 
   async createItem(companyId: number, userId: number, data: {
-    item_code: string;
     item_name: string;
     description?: string;
     category?: string;
@@ -53,19 +52,9 @@ export const itemService = {
       throw new AppError('Company not found', 404);
     }
 
-    // Check unique item_code
-    const existing = await prisma.items.findFirst({
-      where: { company_id: companyId, item_code: data.item_code },
-    });
-
-    if (existing) {
-      throw new AppError('Item code already exists', 400);
-    }
-
     return await prisma.items.create({
       data: {
         company_id: companyId,
-        item_code: data.item_code,
         item_name: data.item_name,
         description: data.description,
         category: data.category,
@@ -78,29 +67,13 @@ export const itemService = {
   },
 
   async updateItem(itemId: number, companyId: number, userId: number, data: {
-    item_code?: string;
     item_name?: string;
     description?: string;
     category?: string;
     unit?: string;
     unit_price?: number;
-    is_active?: boolean;
   }) {
     await this.getItemById(itemId, companyId, userId);
-
-    if (data.item_code) {
-      const existing = await prisma.items.findFirst({
-        where: {
-          company_id: companyId,
-          item_code: data.item_code,
-          id: { not: itemId },
-        },
-      });
-
-      if (existing) {
-        throw new AppError('Item code already exists', 400);
-      }
-    }
 
     return await prisma.items.update({
       where: { id: itemId },
