@@ -13,7 +13,10 @@ export const createReceiptSchema = Joi.object({
     'any.required': 'Amount is required',
     'number.min': 'Amount must be greater than or equal to 0',
   }),
-  payment_method: Joi.string().valid('cash', 'transfer', 'check', 'other').default('cash'),
+  payment_method: Joi.array()
+    .items(Joi.string().valid('cash', 'transfer', 'check', 'other'))
+    .min(1)
+    .default(['cash']),
   status: Joi.string().valid('lunas', 'dp', 'piutang').default('dp'),
   description: Joi.string().allow('', null).optional(),
   received_by: Joi.string().allow('', null).optional(),
@@ -22,7 +25,10 @@ export const createReceiptSchema = Joi.object({
 
 export const updateReceiptSchema = Joi.object({
   amount: Joi.number().min(0).optional(),
-  payment_method: Joi.string().valid('cash', 'transfer', 'check', 'other').optional(),
+  payment_method: Joi.array()
+    .items(Joi.string().valid('cash', 'transfer', 'check', 'other'))
+    .min(1)
+    .optional(),
   status: Joi.string().valid('lunas', 'dp', 'piutang').optional(),
   description: Joi.string().allow('', null).optional(),
   received_by: Joi.string().allow('', null).optional(),
@@ -30,6 +36,7 @@ export const updateReceiptSchema = Joi.object({
 });
 
 export const companyIdParamSchema = Joi.object({
+  id: Joi.number().integer().positive().allow(null),
   companyId: Joi.number().integer().positive().required(),
 });
 

@@ -1,4 +1,4 @@
-import { invoices_status, invoices_payment_status, receipts_payment_method, invoice_items_discount_type } from '../../../../prisma/generated/prisma';
+import { invoices_payment_status, receipts_payment_method, invoice_items_discount_type } from '../../../../prisma/generated/prisma';
 
 export interface Invoice {
   id: number;
@@ -13,7 +13,6 @@ export interface Invoice {
   discount_amount: number;
   shipping_cost: number;
   total_amount: number;
-  status: invoices_status;
   notes?: string | null;
   generated_file_path?: string | null;
   created_by: number;
@@ -67,7 +66,6 @@ export interface UpdateInvoiceDto {
   discount_amount?: number;
   shipping_cost?: number;
   notes?: string;
-  status?: invoices_status;
   items?: CreateInvoiceItemDto[];
 }
 
@@ -137,7 +135,6 @@ export interface PaymentHistoryItem {
 export interface InvoiceQueryParams {
   page?: number;
   limit?: number;
-  status?: invoices_status;
   customer_id?: number;
   search?: string;
 }

@@ -4,7 +4,7 @@ import { prisma } from '../../../database/prisma.client';
 import { CreateInvoiceDto, UpdateInvoiceDto, CreatePaymentDto, UpdatePaymentDto } from '../interfaces/invoice.interface';
 import { AppError } from '../../../middleware';
 import { documentGenerator } from '../../../shared/utils/document.generator.util';
-import { invoices_status, invoices_payment_status, receipts_payment_method, invoice_items_discount_type } from '../../../../prisma/generated/prisma';
+import { invoices_payment_status, receipts_payment_method, invoice_items_discount_type } from '../../../../prisma/generated/prisma';
 
 const calcItemDiscount = (quantity: number, unit_price: number, discount_amount: number, discount_type: string): number => {
   if (discount_type === 'persen') return quantity * unit_price * (discount_amount / 100);
@@ -26,7 +26,6 @@ export const invoiceService = {
     userId: number,
     page = 1,
     limit = 10,
-    status?: invoices_status,
     customerId?: number,
     search?: string,
     dateFrom?: Date,
@@ -41,7 +40,6 @@ export const invoiceService = {
 
     const where: Record<string, unknown> = {
       company_id: companyId,
-      ...(status && { status }),
       ...(customerId && { customer_id: customerId }),
       ...(paymentStatus && { payment_status: paymentStatus }),
       ...(search && {
@@ -141,7 +139,6 @@ export const invoiceService = {
       discount_amount: discountAmount,
       shipping_cost: shippingCost,
       total_amount: totalAmount,
-      status: 'draft' as const,
       notes: data.notes || null,
       created_by: userId,
     };
@@ -189,14 +186,6 @@ export const invoiceService = {
 
     if (!existingInvoice) throw new AppError('Invoice not found', 404);
 
-    if (existingInvoice.status === 'cancelled') {
-      throw new AppError('Cannot update cancelled invoice', 400);
-    }
-
-    if (existingInvoice.status === 'paid' && data.status !== 'cancelled') {
-      throw new AppError('Cannot update paid invoice except to cancel', 400);
-    }
-
     let subtotal = Number(existingInvoice.subtotal);
     if (data.items && data.items.length > 0) {
       subtotal = data.items.reduce((sum, item) => {
@@ -225,7 +214,6 @@ export const invoiceService = {
           subtotal: data.items ? subtotal : undefined,
           total_amount: totalAmount,
           notes: data.notes,
-          status: data.status as invoices_status,
           updated_at: new Date(),
           ...(data.items && data.items.length > 0
             ? {
@@ -270,12 +258,24 @@ export const invoiceService = {
 
     if (!existingInvoice) throw new AppError('Invoice not found', 404);
 
+    const linkedParts: string[] = [];
     if (existingInvoice.receipts.length > 0) {
-      throw new AppError('Cannot delete invoice with linked receipts', 400);
+      const numbers = existingInvoice.receipts.map((r) => r.receipt_number).join(', ');
+      linkedParts.push(`receipts (${numbers})`);
+    }
+    if (existingInvoice.waybills.length > 0) {
+      const numbers = existingInvoice.waybills.map((w) => w.waybill_number).join(', ');
+      linkedParts.push(`waybills (${numbers})`);
     }
 
-    if (existingInvoice.waybills.length > 0) {
-      throw new AppError('Cannot delete invoice with linked waybills', 400);
+    if (linkedParts.length > 0) {
+      const linkedList = linkedParts.join(' dan ');
+      const deleteList = linkedParts.map((p) => p.split(' ')[0]).join(' dan ');
+      throw new AppError(
+        `Invoice tidak bisa didelete karena digunakan oleh ${linkedList}. ` +
+        `Jika tetap ingin delete invoice, delete terlebih dahulu ${deleteList} terkait.`,
+        400
+      );
     }
 
     if (existingInvoice.generated_file_path) {
@@ -328,7 +328,6 @@ export const invoiceService = {
       document_number: invoice.invoice_number,
       date: invoice.invoice_date.toISOString(),
       due_date: invoice.due_date?.toISOString(),
-      status: invoice.status,
       customer_name: (invoice.customers as any)?.name ?? '',
       customer_company: (invoice.customers as any)?.company_name ?? '',
       customer_address: [
@@ -423,11 +422,11 @@ export const invoiceService = {
       }),
       prisma.invoices.findFirst({
         where: { id: invoiceId, company_id: companyId },
-        select: { total_amount: true, status: true },
+        select: { total_amount: true },
       }),
     ]);
 
-    if (!invoice || invoice.status === 'cancelled') return;
+    if (!invoice) return;
 
     const totalPaid = payments.reduce((s, p) => s + Number(p.amount), 0);
     const totalAmount = Number(invoice.total_amount);
@@ -457,7 +456,6 @@ export const invoiceService = {
       where: { id: invoiceId, company_id: companyId },
     });
     if (!invoice) throw new AppError('Invoice not found', 404);
-    if (invoice.status === 'cancelled') throw new AppError('Cannot add payment to cancelled invoice', 400);
 
     const payment = await prisma.invoice_payments.create({
       data: {
@@ -524,10 +522,6 @@ export const invoiceService = {
     await this.recalculateTotals(invoiceId, companyId);
 
     return true;
-  },
-
-  async updateStatus(id: number, companyId: number, userId: number, status: invoices_status) {
-    return this.update(id, companyId, userId, { status });
   },
 
   resolveLogoToBase64(logoUrl?: string | null): string | undefined {

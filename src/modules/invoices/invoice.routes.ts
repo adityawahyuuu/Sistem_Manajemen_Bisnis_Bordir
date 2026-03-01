@@ -39,11 +39,6 @@ router.use(authMiddleware);
  *           type: integer
  *           default: 10
  *       - in: query
- *         name: status
- *         schema:
- *           type: string
- *           enum: [draft, sent, paid, cancelled]
- *       - in: query
  *         name: customer_id
  *         schema:
  *           type: integer
@@ -224,7 +219,7 @@ router.get('/:companyId/:id', validate(companyIdParamSchema, 'params'), invoiceC
  *                 type: string
  *               status:
  *                 type: string
- *                 enum: [draft, sent, paid, cancelled]
+ *                 enum: [paid, cancelled]
  *     responses:
  *       200:
  *         description: Invoice updated successfully
@@ -335,43 +330,6 @@ router.post('/:companyId/:id/generate', validate(companyIdParamSchema, 'params')
  *               format: binary
  */
 router.get('/:companyId/:id/download', validate(companyIdParamSchema, 'params'), invoiceController.download);
-
-/**
- * @swagger
- * /invoices/{companyId}/{id}/status:
- *   patch:
- *     summary: Update invoice status
- *     tags: [Invoices]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: companyId
- *         required: true
- *         schema:
- *           type: integer
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - status
- *             properties:
- *               status:
- *                 type: string
- *                 enum: [draft, sent, paid, cancelled]
- *     responses:
- *       200:
- *         description: Invoice status updated successfully
- */
-router.patch('/:companyId/:id/status', validate(companyIdParamSchema, 'params'), invoiceController.updateStatus);
 
 /**
  * @swagger

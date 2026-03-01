@@ -1,4 +1,6 @@
-import { receipts_payment_method, receipts_status } from '../../../../prisma/generated/prisma';
+import { receipts_status } from '../../../../prisma/generated/prisma';
+
+export type PaymentMethod = 'cash' | 'transfer' | 'check' | 'other';
 
 export interface Receipt {
   id: number;
@@ -8,7 +10,7 @@ export interface Receipt {
   receipt_number: string;
   receipt_date: Date;
   amount: number;
-  payment_method: receipts_payment_method;
+  payment_method: PaymentMethod[];
   status: receipts_status;
   description?: string | null;
   received_by?: string | null;
@@ -25,7 +27,7 @@ export interface CreateReceiptDto {
   customer_id: number;
   receipt_date?: string;
   amount: number;
-  payment_method?: receipts_payment_method;
+  payment_method?: PaymentMethod[];
   status?: receipts_status;
   description?: string;
   received_by?: string;
@@ -34,7 +36,7 @@ export interface CreateReceiptDto {
 
 export interface UpdateReceiptDto {
   amount?: number;
-  payment_method?: receipts_payment_method;
+  payment_method?: PaymentMethod[];
   status?: receipts_status;
   description?: string;
   received_by?: string;
@@ -46,7 +48,6 @@ export interface ReceiptQueryParams {
   limit?: number;
   customer_id?: number;
   invoice_id?: number;
-  payment_method?: receipts_payment_method;
   status?: receipts_status;
   search?: string;
 }

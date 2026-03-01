@@ -57,8 +57,6 @@ export const updateInvoiceSchema = Joi.object({
   discount_amount: Joi.number().min(0).optional(),
   shipping_cost: Joi.number().min(0).optional(),
   notes: Joi.string().allow('', null).optional(),
-  status: Joi.string().valid('draft', 'sent', 'paid', 'cancelled').optional(),
-
   items: Joi.array()
     .items(invoiceItemSchema)
     .min(1)
@@ -105,7 +103,6 @@ export const companyIdParamSchema = Joi.object({
 export const invoiceQuerySchema = Joi.object({
   page: Joi.number().integer().min(1).default(1),
   limit: Joi.number().integer().min(1).max(100).default(10),
-  status: Joi.string().valid('draft', 'sent', 'paid', 'cancelled').optional(),
   customer_id: Joi.number().integer().positive().optional(),
   search: Joi.string().optional(),
   date_from: Joi.date().iso().optional(),

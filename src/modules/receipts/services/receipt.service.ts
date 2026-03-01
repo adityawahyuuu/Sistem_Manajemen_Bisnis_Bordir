@@ -4,7 +4,7 @@ import { prisma } from '../../../database/prisma.client';
 import { CreateReceiptDto, UpdateReceiptDto } from '../interfaces/receipt.interface';
 import { AppError } from '../../../middleware';
 import { documentGenerator } from '../../../shared/utils/document.generator.util';
-import { receipts_payment_method, receipts_status } from '../../../../prisma/generated/prisma';
+import { receipts_status } from '../../../../prisma/generated/prisma';
 import { getDefaultReceiptTemplate } from '../../../shared/utils/html-builder.util';
 import { storageConfig } from '../../../config/app.config';
 
@@ -16,7 +16,7 @@ export const receiptService = {
     limit = 10,
     customerId?: number,
     invoiceId?: number,
-    paymentMethod?: receipts_payment_method,
+    paymentMethod?: string,
     status?: receipts_status,
     search?: string
   ) {
@@ -117,7 +117,7 @@ export const receiptService = {
       invoice_id: data.invoice_id,
       receipt_date: data.receipt_date ? new Date(data.receipt_date) : new Date(),
       amount: data.amount,
-      payment_method: (data.payment_method || 'cash') as receipts_payment_method,
+      payment_method: data.payment_method?.length ? data.payment_method : ['cash'],
       status: (data.status || 'dp') as receipts_status,
       description: data.description || null,
       received_by: data.received_by || null,
@@ -167,7 +167,7 @@ export const receiptService = {
       where: { id },
       data: {
         amount: data.amount,
-        payment_method: data.payment_method as receipts_payment_method,
+        payment_method: data.payment_method,
         status: data.status as receipts_status,
         description: data.description,
         received_by: data.received_by,
@@ -236,7 +236,7 @@ export const receiptService = {
       ].filter(Boolean).join(', '),
       customer_phone: receipt.customers?.phone ?? '',
       amount: Number(receipt.amount),
-      payment_method: receipt.payment_method,
+      payment_method: (receipt.payment_method as string[]).join(', '),
       description: receipt.description ?? undefined,
       received_by: receipt.received_by ?? undefined,
       notes: receipt.notes ?? undefined,

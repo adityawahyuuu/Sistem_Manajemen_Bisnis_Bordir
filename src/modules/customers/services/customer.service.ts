@@ -32,7 +32,7 @@ export const customerService = {
         orderBy: { created_at: 'desc' },
         include: {
           invoices: {
-            where: { status: { not: 'cancelled' } },
+            where: {},
             select: { total_amount: true, total_paid: true },
           },
         },
@@ -66,7 +66,6 @@ export const customerService = {
           include: { items: true },
         },
         invoices: {
-          where: { status: { not: 'cancelled' } },
           select: { total_amount: true, total_paid: true },
         },
       },

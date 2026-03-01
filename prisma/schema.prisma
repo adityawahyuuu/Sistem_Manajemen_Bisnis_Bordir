@@ -149,7 +149,6 @@ model invoices {
   discount_amount     Decimal         @default(0.00) @db.Decimal(15, 2)
   shipping_cost       Decimal         @default(0.00) @db.Decimal(15, 2)
   total_amount        Decimal         @default(0.00) @db.Decimal(15, 2)
-  status              invoices_status         @default(draft)
   total_paid          Decimal                 @default(0.00) @db.Decimal(15, 2)
   payment_status      invoices_payment_status @default(belum_bayar)
   notes               String?                 @db.Text
@@ -197,7 +196,7 @@ model receipts {
   receipt_number      String                  @db.VarChar(100)
   receipt_date        DateTime                @db.Date
   amount              Decimal                 @default(0.00) @db.Decimal(15, 2)
-  payment_method      receipts_payment_method @default(cash)
+  payment_method      Json
   description         String?                 @db.Text
   received_by         String?                 @db.VarChar(255)
   notes               String?                 @db.Text
@@ -402,13 +401,6 @@ enum invoices_payment_status {
   belum_bayar
   dp
   lunas
-}
-
-enum invoices_status {
-  draft
-  sent
-  paid
-  cancelled
 }
 
 enum waybills_status {

@@ -40,6 +40,7 @@ export const updateWaybillSchema = Joi.object({
 });
 
 export const companyIdParamSchema = Joi.object({
+  id: Joi.number().integer().positive().allow(null),
   companyId: Joi.number().integer().positive().required(),
 });
 

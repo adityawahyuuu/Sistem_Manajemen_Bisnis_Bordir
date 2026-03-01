@@ -8,7 +8,6 @@ import {
   sendSuccessWithDates,
   sendCreatedWithDates,
 } from '../../../shared/utils/response.util';
-import { invoices_status } from '../../../../prisma/generated/prisma';
 
 export const invoiceController = {
   async findAllByCompany(req: Request, res: Response, next: NextFunction) {
@@ -17,7 +16,6 @@ export const invoiceController = {
       const userId = parseInt(req.user!.id);
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
-      const status = req.query.status as invoices_status | undefined;
       const customerId = req.query.customer_id ? parseInt(req.query.customer_id as string) : undefined;
       const search = req.query.search as string | undefined;
       const dateFrom = req.query.date_from ? new Date(req.query.date_from as string) : undefined;
@@ -25,7 +23,7 @@ export const invoiceController = {
       const paymentStatus = req.query.payment_status as 'lunas' | 'dp' | 'belum_bayar' | undefined;
 
       const { data, total } = await invoiceService.findAllByCompany(
-        companyId, userId, page, limit, status, customerId, search, dateFrom, dateTo, paymentStatus
+        companyId, userId, page, limit, customerId, search, dateFrom, dateTo, paymentStatus
       );
 
       sendSuccessWithDates(res, data, 'Invoices retrieved', 200, {
@@ -183,17 +181,4 @@ export const invoiceController = {
     }
   },
 
-  async updateStatus(req: Request, res: Response, next: NextFunction) {
-    try {
-      const id = parseInt(req.params.id);
-      const companyId = parseInt(req.params.companyId);
-      const userId = parseInt(req.user!.id);
-      const { status } = req.body;
-
-      const invoice = await invoiceService.updateStatus(id, companyId, userId, status);
-      sendSuccessWithDates(res, invoice, 'Invoice status updated');
-    } catch (error) {
-      next(error);
-    }
-  },
 };

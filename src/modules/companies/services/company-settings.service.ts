@@ -55,8 +55,16 @@ export const companySettingsService = {
       throw new AppError('Company not found', 404);
     }
 
+    // Get current prefix before update
+    const currentSettings = await prisma.company_settings.findUnique({
+      where: { company_id: companyId },
+      select: { invoice_prefix: true },
+    });
+    const oldPrefix = currentSettings?.invoice_prefix ?? 'INV';
+    const newPrefix = data.invoice_prefix;
+
     // Upsert settings
-    return await prisma.company_settings.upsert({
+    const updated = await prisma.company_settings.upsert({
       where: { company_id: companyId },
       create: {
         company_id: companyId,
@@ -69,5 +77,28 @@ export const companySettingsService = {
         updated_at: new Date(),
       },
     });
+
+    // Rename existing document numbers if prefix changed
+    if (newPrefix && newPrefix !== oldPrefix) {
+      await Promise.all([
+        prisma.$executeRaw`
+          UPDATE invoices
+          SET invoice_number = REPLACE(invoice_number, ${`/${oldPrefix}/`}, ${`/${newPrefix}/`})
+          WHERE company_id = ${companyId}
+        `,
+        prisma.$executeRaw`
+          UPDATE receipts
+          SET receipt_number = REPLACE(receipt_number, ${`/${oldPrefix}/`}, ${`/${newPrefix}/`})
+          WHERE company_id = ${companyId}
+        `,
+        prisma.$executeRaw`
+          UPDATE waybills
+          SET waybill_number = REPLACE(waybill_number, ${`/${oldPrefix}/`}, ${`/${newPrefix}/`})
+          WHERE company_id = ${companyId}
+        `,
+      ]);
+    }
+
+    return updated;
   },
 };
