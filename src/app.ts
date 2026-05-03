@@ -79,7 +79,7 @@ app.get('/api-docs.json', async (req, res) => {
 
 // Static file serving for uploads
 app.use(
-  '/uploads',
+  '/patchwork/uploads',
   express.static(path.resolve(storageConfig.uploadsPath), {
     setHeaders(res) {
       res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');

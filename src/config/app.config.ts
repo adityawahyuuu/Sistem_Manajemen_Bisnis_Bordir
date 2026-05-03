@@ -7,7 +7,7 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 export const appConfig = {
   env: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT || '3000', 10),
-  apiPrefix: process.env.API_PREFIX || '/api/v1',
+  apiPrefix: process.env.API_PREFIX || '/patchwork/api',
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3001',
 };
 
