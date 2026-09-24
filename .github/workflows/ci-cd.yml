@@ -11,7 +11,11 @@ jobs:
     runs-on: self-hosted
     defaults:
       run:
-        shell: bash
+        # Windows PowerShell 5.1 — this runner doesn't have pwsh (PowerShell
+        # Core) installed. `shell: bash` breaks here: the runner hands bash a
+        # Windows-style temp script path (D:\...\xxx.sh) and bash eats the
+        # backslashes as escape characters, corrupting the path.
+        shell: powershell
     steps:
       - uses: actions/checkout@v4
 
@@ -43,9 +47,9 @@ jobs:
     runs-on: self-hosted
     defaults:
       run:
-        shell: bash
+        shell: powershell
     env:
-      COMPOSE_DIR: "/d/gawe/Full Stack - Patchwork_Invoice_System"
+      COMPOSE_DIR: 'D:\gawe\Full Stack - Patchwork_Invoice_System'
       IMAGE_TAG: patchwork-invoice-system-api:latest
     steps:
       - uses: actions/checkout@v4
@@ -54,14 +58,18 @@ jobs:
       # the `docker compose up` step below reuses this image instead of
       # rebuilding from the old on-disk checkout.
       - name: Build Docker image
-        run: docker build -t "$IMAGE_TAG" .
+        run: docker build -t $env:IMAGE_TAG .
 
       - name: Deploy (recreate container with the new image)
         run: |
-          cd "$COMPOSE_DIR"
+          Set-Location $env:COMPOSE_DIR
           docker compose up -d api
 
       - name: Health check
         run: |
-          sleep 5
-          curl -f http://localhost:5090/health
+          Start-Sleep -Seconds 5
+          $response = Invoke-WebRequest -Uri "http://localhost:5090/health" -UseBasicParsing
+          if ($response.StatusCode -ne 200) {
+            throw "Health check failed: $($response.StatusCode)"
+          }
+          Write-Output "Health check OK"
