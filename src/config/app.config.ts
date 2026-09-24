@@ -4,9 +4,17 @@ import path from 'path';
 // Resolve .env from project root (works regardless of cwd)
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
+const nodeEnv = process.env.NODE_ENV || 'development';
+const isProduction = nodeEnv === 'production';
+
+// Production port is fixed and must not drift between deploys, regardless of
+// what PORT is set to in the environment. Development reads PORT from .env
+// so a dev can run on a free port locally.
+const PRODUCTION_PORT = 5090;
+
 export const appConfig = {
-  env: process.env.NODE_ENV || 'development',
-  port: parseInt(process.env.PORT || '3000', 10),
+  env: nodeEnv,
+  port: isProduction ? PRODUCTION_PORT : parseInt(process.env.PORT || '3000', 10),
   apiPrefix: process.env.API_PREFIX || '/patchwork/api',
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3001',
 };

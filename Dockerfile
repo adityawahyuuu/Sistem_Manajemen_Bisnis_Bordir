@@ -31,7 +31,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
+# Install dependencies (NODE_ENV not yet set to production, so devDependencies
+# like typescript/@types/* install too — needed for the build step below)
 RUN npm ci
 
 # Copy source code
@@ -43,8 +44,11 @@ RUN npm run build
 # Create storage directories
 RUN mkdir -p storage/generated storage/templates storage/whatsapp
 
-# Expose port
-EXPOSE 3000
+# Set after install+build so it only affects the running app, not `npm ci`
+ENV NODE_ENV=production
+
+# Expose the fixed production port
+EXPOSE 5090
 
 # Start application
 CMD ["node", "dist/server.js"]
